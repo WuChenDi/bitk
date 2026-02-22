@@ -1,0 +1,230 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "loading": "Loading...",
+    "search": "Search...",
+    "select": "Select"
+  },
+  "project": {
+    "projects": "Projects",
+    "create": "Create Project",
+    "createDescription": "Create a new project to organize your issues",
+    "settings": "Project Settings",
+    "settingsDescription": "Update project details",
+    "name": "Name",
+    "description": "Description",
+    "alias": "Alias",
+    "aliasPlaceholder": "myproject",
+    "aliasHint": "Only lowercase letters and numbers. Auto-generated if empty.",
+    "directory": "Directory",
+    "repositoryUrl": "Repository URL",
+    "namePlaceholder": "My Project",
+    "descriptionPlaceholder": "What is this project about?",
+    "directoryPlaceholder": "/path/to/project",
+    "repositoryUrlPlaceholder": "https://github.com/org/repo",
+    "createButton": "Create Project",
+    "creating": "Creating...",
+    "saving": "Saving...",
+    "saveChanges": "Save Changes",
+    "newProject": "New Project",
+    "issueCount": "{{count}} issues",
+    "statusCount": "{{count}} statuses",
+    "browseDirectories": "Browse directories",
+    "directoryAlreadyUsed": "This directory is already used by another project"
+  },
+  "kanban": {
+    "newIssue": "New Issue",
+    "filter": "Filter",
+    "loadingBoard": "Loading board...",
+    "noColumns": "No columns configured",
+    "loadingProject": "Loading project...",
+    "projectNotFound": "Project not found",
+    "issueDetails": "Issue Details",
+    "createIssueIn": "Create issue in {{name}}",
+    "resizePanel": "Resize panel"
+  },
+  "issue": {
+    "status": "Status",
+    "priority": "Priority",
+    "noDescription": "No description",
+    "description": "Description",
+    "created": "Created",
+    "updated": "Updated",
+    "createTask": "Create Task",
+    "describeWork": "Describe what you want to work on...",
+    "cmdEnterSubmit": "Cmd+Enter to submit",
+    "properties": "Properties",
+    "selectStatus": "Select status",
+    "notFound": "Issue not found",
+    "backToBoard": "Back to board",
+    "backToList": "Back to list",
+    "selectToStart": "Select an issue to get started",
+    "copyLink": "Copy link",
+    "openFullPage": "Open in full page",
+    "closePanel": "Close panel",
+    "subIssues": "Sub-issues",
+    "createSubIssue": "Create Sub-issue",
+    "noSubIssues": "No sub-issues",
+    "emptyStatusHint": "No issues",
+    "emptyStatusDropHint": "Drop issues here",
+    "editTitle": "Click to edit title",
+    "addDescription": "Add a description...",
+    "clickToEdit": "Click to edit"
+  },
+  "createIssue": {
+    "model": "Model",
+    "engine": "Engine",
+    "creating": "Creating...",
+    "create": "Create Task",
+    "mode": "Mode",
+    "permission": "Permission",
+    "perm": {
+      "auto": "Auto",
+      "ask": "Ask",
+      "plan": "Plan"
+    },
+    "engineLabel": {
+      "default": "Default",
+      "coder": "Coder",
+      "planner": "Planner",
+      "reviewer": "Reviewer",
+      "researcher": "Researcher",
+      "echo": "Echo"
+    },
+    "engineDesc": {
+      "default": "Auto assign",
+      "coder": "Write code",
+      "planner": "Plan tasks",
+      "reviewer": "Review code",
+      "researcher": "Research",
+      "echo": "Mock engine"
+    },
+    "modelDesc": {
+      "opus": "Most capable",
+      "sonnet": "Best for coding",
+      "haiku": "Fastest"
+    },
+    "worktree": "Worktree",
+    "worktreeOn": "Enabled",
+    "worktreeOff": "Disabled",
+    "modelDefault": "Default",
+    "modelDefaultHint": "Use system default"
+  },
+  "chat": {
+    "send": "Send",
+    "filesChanged": "{{count}} files changed",
+    "placeholder": "Continue working on this task...",
+    "placeholderTodo": "Type a message (queued until execution starts)",
+    "pendingMessage": "Queued — will be sent when execution starts",
+    "doneMessage": "Note — task is completed",
+    "busyAction": {
+      "label": "Busy strategy",
+      "queue": "Queue",
+      "cancel": "Cancel then send"
+    }
+  },
+  "diff": {
+    "changes": "Changes",
+    "closeDiffPanel": "Close diff panel",
+    "noChanges": "No changes to display",
+    "notGitRepo": "Current project directory is not a Git repository",
+    "loadFailed": "Failed to load file changes",
+    "emptyPatch": "No patch content available for this file",
+    "emptyFile": "No file content available",
+    "truncated": "Patch output is truncated"
+  },
+  "session": {
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "sending": "Sending...",
+    "starting": "Starting...",
+    "thinking": "AI is thinking...",
+    "duration": "Completed in {{time}}",
+    "status": {
+      "pending": "Pending",
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "tool": {
+      "fileRead": "Read file",
+      "fileEdit": "Edit file",
+      "commandRun": "Run command",
+      "search": "Search",
+      "webFetch": "Fetch URL"
+    },
+    "restart": "Restart",
+    "restarting": "Restarting..."
+  },
+  "directory": {
+    "browse": "Browse Directory",
+    "browseDescription": "Navigate to a directory and select it",
+    "noSubdirs": "No subdirectories",
+    "newFolder": "New Folder",
+    "folderName": "Folder name",
+    "create": "Create"
+  },
+  "theme": {
+    "switchTheme": "Switch theme",
+    "system": "System",
+    "light": "Light",
+    "dark": "Dark",
+    "switchToLight": "Switch to light mode",
+    "switchToDark": "Switch to dark mode"
+  },
+  "sidebar": {
+    "home": "Home",
+    "menu": "Menu",
+    "createProject": "Create project",
+    "settings": "Settings"
+  },
+  "language": {
+    "switchLanguage": "Switch language"
+  },
+  "viewMode": {
+    "switchView": "Switch view mode",
+    "kanban": "Kanban",
+    "list": "List"
+  },
+  "settings": {
+    "title": "Settings",
+    "appearance": "Appearance",
+    "language": "Language",
+    "display": "Display",
+    "engines": "AI Engines",
+    "engineInstalled": "Installed",
+    "engineNotInstalled": "Not installed",
+    "engineAuthenticated": "Authenticated",
+    "engineUnauthenticated": "Not authenticated",
+    "detecting": "Detecting engines...",
+    "version": "v{{version}}",
+    "models": "{{count}} models",
+    "defaultModel": "Default Model",
+    "probe": "Refresh",
+    "probing": "Detecting engines...",
+    "workspacePath": "Default Workspace Path",
+    "workspacePathHint": "Default directory when creating projects",
+    "browseWorkspace": "Browse workspace directory",
+    "defaultEngine": "Default Engine",
+    "defaultEngineHint": "Engine used by default when creating new issues",
+    "noAvailableEngines": "No available engines"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred. Please try reloading the page.",
+    "reload": "Reload page"
+  },
+  "statusName": {
+    "Todo": "Todo",
+    "Working": "Working",
+    "Review": "Review",
+    "Done": "Done"
+  },
+  "priorityName": {
+    "urgent": "Urgent",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  }
+}

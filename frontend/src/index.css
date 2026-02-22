@@ -1,0 +1,431 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* ─── Light: green-tinted neutrals for cohesion with dark theme ─── */
+:root {
+  --background: oklch(0.99 0.003 130);
+  --foreground: oklch(0.3 0.008 120);
+  --card: oklch(1 0.002 130);
+  --card-foreground: oklch(0.3 0.008 120);
+  --popover: oklch(1 0.002 130);
+  --popover-foreground: oklch(0.3 0.008 120);
+  --primary: oklch(0.46 0.16 250);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.955 0.004 130);
+  --secondary-foreground: oklch(0.3 0.008 120);
+  --muted: oklch(0.955 0.004 130);
+  --muted-foreground: oklch(0.5 0.008 120);
+  --accent: oklch(0.92 0.006 130);
+  --accent-foreground: oklch(0.3 0.008 120);
+  --destructive: oklch(0.57 0.22 25);
+  --border: oklch(0.91 0.004 130);
+  --input: oklch(0.91 0.004 130);
+  --ring: oklch(0.46 0.16 250);
+  --sidebar: oklch(0.965 0.004 130);
+  --sidebar-foreground: oklch(0.3 0.008 120);
+  --sidebar-border: oklch(0.89 0.006 130);
+  --radius: 0.5rem;
+  --mesh-spot-1: oklch(0.88 0.03 140 / 10%);
+  --mesh-spot-2: oklch(0.88 0.02 220 / 8%);
+}
+
+/* ─── Dark: VSCode "Monokai" ─── */
+.dark {
+  --background: oklch(0.24 0.02 110);
+  --foreground: oklch(0.97 0.01 105);
+  --card: oklch(0.2 0.02 110);
+  --card-foreground: oklch(0.97 0.01 105);
+  --popover: oklch(0.22 0.02 110);
+  --popover-foreground: oklch(0.97 0.01 105);
+  --primary: oklch(0.82 0.22 128);
+  --primary-foreground: oklch(0.2 0.02 110);
+  --secondary: oklch(0.34 0.02 95);
+  --secondary-foreground: oklch(0.97 0.01 105);
+  --muted: oklch(0.34 0.02 95);
+  --muted-foreground: oklch(0.54 0.04 90);
+  --accent: oklch(0.38 0.02 90);
+  --accent-foreground: oklch(0.97 0.01 105);
+  --destructive: oklch(0.59 0.27 10);
+  --border: oklch(0.32 0.02 90);
+  --input: oklch(0.38 0.02 90);
+  --ring: oklch(0.82 0.22 128);
+  --sidebar: oklch(0.17 0.02 110);
+  --sidebar-foreground: oklch(0.97 0.01 105);
+  --sidebar-border: oklch(0.25 0.02 90);
+  --mesh-spot-1: oklch(0.28 0.05 130 / 18%);
+  --mesh-spot-2: oklch(0.28 0.03 200 / 12%);
+}
+
+@theme inline {
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+}
+
+/* ─── Entry animations ─── */
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes message-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes thinking-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.2;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    touch-action: manipulation;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans);
+    background-image:
+      radial-gradient(
+        ellipse at 15% 85%,
+        var(--mesh-spot-1) 0%,
+        transparent 50%
+      ),
+      radial-gradient(
+        ellipse at 85% 15%,
+        var(--mesh-spot-2) 0%,
+        transparent 50%
+      );
+    background-attachment: fixed;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Custom scrollbar — subtle by default, visible on hover */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.5 0 0 / 10%);
+    border-radius: 3px;
+  }
+
+  .dark ::-webkit-scrollbar-thumb {
+    background: oklch(0.8 0 0 / 10%);
+  }
+
+  *:hover > ::-webkit-scrollbar-thumb,
+  *:hover::-webkit-scrollbar-thumb {
+    background: oklch(0.5 0 0 / 25%);
+  }
+
+  .dark *:hover > ::-webkit-scrollbar-thumb,
+  .dark *:hover::-webkit-scrollbar-thumb {
+    background: oklch(0.8 0 0 / 25%);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.5 0 0 / 45%);
+  }
+
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.8 0 0 / 45%);
+  }
+
+  /* Firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: oklch(0.5 0 0 / 10%) transparent;
+  }
+
+  .dark * {
+    scrollbar-color: oklch(0.8 0 0 / 10%) transparent;
+  }
+
+  *:hover {
+    scrollbar-color: oklch(0.5 0 0 / 25%) transparent;
+  }
+
+  .dark *:hover {
+    scrollbar-color: oklch(0.8 0 0 / 25%) transparent;
+  }
+}
+
+@layer utilities {
+  .animate-card-enter {
+    animation: card-enter 0.35s ease-out both;
+  }
+
+  .animate-page-enter {
+    animation: page-enter 0.3s ease-out;
+  }
+
+  .animate-message-enter {
+    animation: message-enter 0.25s ease-out both;
+  }
+
+  .thinking-dots span {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: thinking-dot 1.4s infinite ease-in-out;
+  }
+
+  .thinking-dots span:nth-child(1) {
+    animation-delay: 0s;
+  }
+
+  .thinking-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .thinking-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+}
+
+/* ─── Shiki dual-theme (light/dark via CSS vars) ─── */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+
+.dark .shiki,
+.dark .shiki span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
+
+/* Markdown content — rendered by markdown-it */
+.markdown-content p {
+  margin-bottom: 0.625rem;
+}
+
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content ul {
+  margin-bottom: 0.625rem;
+  list-style-type: disc;
+  padding-left: 1.25rem;
+}
+
+.markdown-content ol {
+  margin-bottom: 0.625rem;
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+}
+
+.markdown-content li {
+  margin-top: 0.125rem;
+  margin-bottom: 0.125rem;
+  padding-left: 0.125rem;
+}
+
+.markdown-content h1 {
+  margin-bottom: 0.5rem;
+  margin-top: 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.markdown-content h2 {
+  margin-bottom: 0.5rem;
+  margin-top: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.markdown-content h3 {
+  margin-bottom: 0.375rem;
+  margin-top: 0.625rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.markdown-content hr {
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+  border-color: hsl(var(--border) / 0.6);
+}
+
+.markdown-content table {
+  width: 100%;
+  min-width: 420px;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-content thead {
+  background: hsl(var(--muted) / 0.6);
+}
+
+.markdown-content th {
+  border: 1px solid hsl(var(--border) / 0.7);
+  padding: 0.375rem 0.75rem;
+  text-align: left;
+  font-weight: 600;
+}
+
+.markdown-content td {
+  border: 1px solid hsl(var(--border) / 0.6);
+  padding: 0.375rem 0.75rem;
+  vertical-align: top;
+}
+
+.markdown-content code:not(pre code) {
+  border-radius: 0.375rem;
+  background: hsl(var(--muted) / 0.6);
+  padding: 0.125rem 0.375rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.markdown-content pre {
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--border) / 0.4);
+  padding: 0.75rem;
+  line-height: 1.4;
+}
+
+.markdown-content pre code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.4;
+  background: transparent;
+  padding: 0;
+}
+
+.markdown-content .shiki {
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.markdown-content a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.markdown-content blockquote {
+  margin-bottom: 0.75rem;
+  border-left: 2px solid hsl(var(--primary) / 0.3);
+  padding-left: 0.75rem;
+  color: hsl(var(--muted-foreground));
+  font-style: italic;
+}
+
+.markdown-content strong {
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+
+/* Tool code surface */
+.code-surface {
+  border: 0;
+  background: color-mix(in oklab, var(--card) 94%, var(--muted) 6%);
+}
+
+/* Shiki code blocks in tool panels */
+.shiki-block .shiki {
+  padding: 0.5rem;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.code-surface .markdown-content pre {
+  margin: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
