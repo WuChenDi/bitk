@@ -108,7 +108,7 @@ export class ClaudeCodeExecutor implements EngineExecutor {
     }
 
     const cmd = builder.build()
-    logger.info(
+    logger.debug(
       {
         issueId: env.issueId,
         cwd: cmd.cwd ?? options.workingDir,
@@ -130,7 +130,7 @@ export class ClaudeCodeExecutor implements EngineExecutor {
     // (tool permission requests, hook callbacks, graceful interruption)
     const handler = new ClaudeProtocolHandler(proc.stdin)
     handler.sendUserMessage(options.prompt)
-    logger.info(
+    logger.debug(
       {
         issueId: env.issueId,
         pid: (proc as { pid?: number }).pid,
@@ -182,7 +182,7 @@ export class ClaudeCodeExecutor implements EngineExecutor {
     }
 
     const cmd = builder.build()
-    logger.info(
+    logger.debug(
       {
         issueId: env.issueId,
         cwd: cmd.cwd ?? options.workingDir,
@@ -204,7 +204,7 @@ export class ClaudeCodeExecutor implements EngineExecutor {
     // Create protocol handler for follow-up session
     const handler = new ClaudeProtocolHandler(proc.stdin)
     handler.sendUserMessage(options.prompt)
-    logger.info(
+    logger.debug(
       {
         issueId: env.issueId,
         pid: (proc as { pid?: number }).pid,
@@ -226,7 +226,7 @@ export class ClaudeCodeExecutor implements EngineExecutor {
   }
 
   async cancel(spawnedProcess: SpawnedProcess): Promise<void> {
-    logger.info(
+    logger.debug(
       { pid: (spawnedProcess.subprocess as { pid?: number }).pid },
       'claude_cancel_requested',
     )
@@ -251,7 +251,7 @@ export class ClaudeCodeExecutor implements EngineExecutor {
     } finally {
       clearTimeout(timeout)
       spawnedProcess.protocolHandler?.close()
-      logger.info(
+      logger.debug(
         { pid: (spawnedProcess.subprocess as { pid?: number }).pid },
         'claude_cancel_completed',
       )

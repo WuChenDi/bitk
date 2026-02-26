@@ -174,7 +174,7 @@ export function flushPendingAsFollowUp(issueId: string, issue: { model: string |
       await issueEngine.followUpIssue(issueId, prompt, issue.model ?? undefined)
       // Delete pending rows only AFTER successful follow-up to prevent message loss
       await markPendingMessagesDispatched(pending.map((m) => m.id))
-      logger.info({ issueId, pendingCount: pending.length }, 'pending_flushed_as_followup')
+      logger.debug({ issueId, pendingCount: pending.length }, 'pending_flushed_as_followup')
     } catch (err) {
       logger.error({ issueId, err }, 'pending_flush_followup_failed')
     }
@@ -248,7 +248,7 @@ export function triggerIssueExecution(
       if (pending.length > 0) {
         await markPendingMessagesDispatched(pending.map((m) => m.id))
       }
-      logger.info({ issueId, pendingCount: pending.length }, 'auto_execute_started')
+      logger.debug({ issueId, pendingCount: pending.length }, 'auto_execute_started')
     } catch (err) {
       logger.error({ issueId, err }, 'auto_execute_failed')
       try {

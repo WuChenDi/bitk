@@ -17,13 +17,16 @@ const logFile = join(logDir, `${name}.log`)
 
 export const logger = pino(
   { level, base: undefined },
-  pino.multistream([{ stream: process.stdout }, { stream: pino.destination(logFile) }]),
+  pino.multistream([
+    { level, stream: process.stdout },
+    { level, stream: pino.destination(logFile) },
+  ]),
 )
 
 export function httpLogger(): MiddlewareHandler {
   return async (c, next) => {
     await next()
     if (c.req.path === '/api/health' || c.req.path === '/api/events') return
-    logger.info(`${c.req.method} ${c.req.path} ${c.res.status}`)
+    logger.debug(`${c.req.method} ${c.req.path} ${c.res.status}`)
   }
 }

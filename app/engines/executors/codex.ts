@@ -172,7 +172,7 @@ interface CodexModelListResponse {
  * Lifecycle: initialize → initialized notification → model/list (paginated) → kill.
  */
 async function queryCodexModels(): Promise<EngineModel[]> {
-  logger.info({ cmd: [...CODEX_CMD, 'app-server'].join(' ') }, 'codex_models_start')
+  logger.debug({ cmd: [...CODEX_CMD, 'app-server'].join(' ') }, 'codex_models_start')
 
   const proc = Bun.spawn([...CODEX_CMD, 'app-server'], {
     stdin: 'pipe',
@@ -229,7 +229,7 @@ async function queryCodexModels(): Promise<EngineModel[]> {
       cursor = result?.nextCursor
     } while (cursor)
 
-    logger.info({ count: models.length, models: models.map((m) => m.id) }, 'codex_models_done')
+    logger.debug({ count: models.length, models: models.map((m) => m.id) }, 'codex_models_done')
     return models
   } catch (error) {
     const stderr = await stderrReader.catch(() => '')

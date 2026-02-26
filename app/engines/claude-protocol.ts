@@ -116,7 +116,7 @@ export class ClaudeProtocolHandler {
             if (!line.trim()) continue
 
             if (IO_LOG_ENABLED && !shouldSkipStdoutIoLog(line)) {
-              logger.info(
+              logger.debug(
                 { stream: 'stdout', line: clipForLog(sanitizeResultLine(line)) },
                 'claude_protocol_io',
               )
@@ -176,7 +176,7 @@ export class ClaudeProtocolHandler {
         request: ControlRequest
       }
       if (IO_LOG_ENABLED) {
-        logger.info(
+        logger.debug(
           {
             stream: 'stdout-control',
             requestId: request_id,
@@ -268,7 +268,7 @@ export class ClaudeProtocolHandler {
     try {
       const json = JSON.stringify(data)
       if (IO_LOG_ENABLED) {
-        logger.info({ stream: 'stdin', line: clipForLog(json) }, 'claude_protocol_io')
+        logger.debug({ stream: 'stdin', line: clipForLog(json) }, 'claude_protocol_io')
       }
       this.stdin.write(`${json}\n`)
       this.stdin.flush?.()

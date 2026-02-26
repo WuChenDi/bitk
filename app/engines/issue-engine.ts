@@ -155,7 +155,7 @@ async function createWorktree(baseDir: string, issueId: string): Promise<string>
       throw new Error(`Failed to create worktree: ${stderr.trim()} / ${retryErr.trim()}`)
     }
   }
-  logger.info({ issueId, worktreeDir, branchName }, 'worktree_created')
+  logger.debug({ issueId, worktreeDir, branchName }, 'worktree_created')
   return worktreeDir
 }
 
@@ -167,7 +167,7 @@ export async function removeWorktree(baseDir: string, worktreeDir: string): Prom
       stderr: 'pipe',
     })
     await proc.exited
-    logger.info({ worktreeDir }, 'worktree_removed')
+    logger.debug({ worktreeDir }, 'worktree_removed')
   } catch (error) {
     logger.warn({ worktreeDir, error }, 'worktree_remove_failed')
     // Fallback: just delete the directory
@@ -226,7 +226,7 @@ export class IssueEngine {
     },
   ): Promise<{ executionId: string }> {
     return this.withIssueLock(issueId, async () => {
-      logger.info(
+      logger.debug(
         {
           issueId,
           engineType: opts.engineType,
@@ -331,7 +331,7 @@ export class IssueEngine {
     busyAction: 'queue' | 'cancel' = 'queue',
   ): Promise<{ executionId: string }> {
     return this.withIssueLock(issueId, async () => {
-      logger.info(
+      logger.debug(
         { issueId, model, permissionMode, busyAction, promptChars: prompt.length },
         'issue_followup_requested',
       )
@@ -371,7 +371,7 @@ export class IssueEngine {
         // and process it only after the current turn/process boundary is reached.
         if (active.state !== 'running' || active.turnInFlight) {
           active.pendingInputs.push({ prompt, model: effectiveModel, permissionMode, busyAction })
-          logger.info(
+          logger.debug(
             {
               issueId,
               executionId: active.executionId,
@@ -390,7 +390,7 @@ export class IssueEngine {
             !active.queueCancelRequested
           ) {
             active.queueCancelRequested = true
-            logger.info(
+            logger.debug(
               {
                 issueId,
                 executionId: active.executionId,
@@ -428,7 +428,7 @@ export class IssueEngine {
         }
       }
 
-      logger.info(
+      logger.debug(
         { issueId, engineType, model: effectiveModel },
         'issue_followup_spawn_new_process',
       )
@@ -539,7 +539,7 @@ export class IssueEngine {
       logger.info({ issueId }, 'issue_cancel_requested')
       const active = this.getActiveProcesses().filter((p) => p.issueId === issueId)
       for (const p of active) {
-        logger.info(
+        logger.debug(
           { issueId, executionId: p.executionId, pid: this.getPidFromManaged(p) },
           'issue_cancel_active_process',
         )
@@ -678,7 +678,7 @@ export class IssueEngine {
 
     this.consumeStream(executionId, issueId, process.stdout, logParser)
     this.consumeStderr(executionId, issueId, process.stderr)
-    logger.info(
+    logger.debug(
       { issueId, executionId, pid: this.getPidFromManaged(managed), turnIndex },
       'issue_process_registered',
     )
@@ -744,7 +744,7 @@ export class IssueEngine {
     const managed = this.processes.get(executionId)
     if (!managed || managed.state !== 'running') return
 
-    logger.info(
+    logger.debug(
       {
         issueId: managed.issueId,
         executionId,
@@ -760,7 +760,7 @@ export class IssueEngine {
     // Soft cancel: interrupt current turn only and keep process alive.
     if (!opts.hard) {
       managed.cancelledByUser = true
-      logger.info(
+      logger.debug(
         { issueId: managed.issueId, executionId, pid: this.getPidFromManaged(managed) },
         'issue_process_interrupt_sent',
       )
@@ -787,7 +787,7 @@ export class IssueEngine {
     } finally {
       clearTimeout(killTimeout)
       managed.finishedAt = new Date()
-      logger.info(
+      logger.debug(
         { issueId: managed.issueId, executionId, pid: this.getPidFromManaged(managed) },
         'issue_process_cancel_finished',
       )
@@ -949,7 +949,7 @@ export class IssueEngine {
     managed.turnInFlight = true
     managed.queueCancelRequested = false
     this.persistUserMessage(issueId, managed.executionId, prompt)
-    logger.info(
+    logger.debug(
       {
         issueId,
         executionId: managed.executionId,
@@ -1088,7 +1088,7 @@ export class IssueEngine {
     if (managed.state !== 'running' || managed.turnInFlight) return
     const next = managed.pendingInputs.shift()
     if (!next) return
-    logger.info(
+    logger.debug(
       {
         issueId,
         executionId: managed.executionId,
@@ -1223,7 +1223,7 @@ export class IssueEngine {
             const nextManaged = this.processes.get(result.executionId)
             if (nextManaged && queued.length > 0) {
               nextManaged.pendingInputs.push(...queued)
-              logger.info(
+              logger.debug(
                 {
                   issueId,
                   fromExecutionId: executionId,
@@ -1314,7 +1314,7 @@ export class IssueEngine {
   }
 
   private async spawnRetry(issueId: string, engineType: EngineType): Promise<void> {
-    logger.info({ issueId, engineType }, 'issue_retry_requested')
+    logger.debug({ issueId, engineType }, 'issue_retry_requested')
     const issue = await getIssueWithSession(issueId)
     if (!issue) throw new Error(`Issue not found: ${issueId}`)
 
@@ -1401,7 +1401,7 @@ export class IssueEngine {
     const turnIndex = this.getNextTurnIndex(issueId)
     this.register(executionId, issueId, spawned, (line) => executor.normalizeLog(line), turnIndex)
     this.monitorCompletion(executionId, issueId, engineType, true)
-    logger.info({ issueId, executionId, engineType, turnIndex }, 'issue_retry_spawned')
+    logger.debug({ issueId, executionId, engineType, turnIndex }, 'issue_retry_spawned')
   }
 
   private async spawnFollowUpProcess(
@@ -1576,7 +1576,7 @@ export class IssueEngine {
       }
     }
     if (cleaned > 0) {
-      logger.info(
+      logger.debug(
         {
           cleaned,
           remainingProcesses: this.processes.size,

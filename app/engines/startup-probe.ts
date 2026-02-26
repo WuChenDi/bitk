@@ -109,7 +109,7 @@ async function runLiveProbe(): Promise<EngineDiscovery> {
     }
 
     const defaultModel = engineModels.find((m) => m.isDefault)
-    logger.info(
+    logger.debug(
       {
         engineType: availability.engineType,
         installed: availability.installed,
@@ -139,7 +139,7 @@ export async function getEngineDiscovery(): Promise<EngineDiscovery> {
   // 2. DB
   const dbData = await getProbeResults()
   if (dbData) {
-    logger.info(
+    logger.debug(
       {
         engines: dbData.engines.length,
         modelsDiscovered: Object.keys(dbData.models).length,
