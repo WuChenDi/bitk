@@ -130,6 +130,7 @@ export const kanbanApi = {
     permissionMode?: PermissionMode,
     busyAction?: BusyAction,
     files?: File[],
+    meta?: boolean,
   ) => {
     if (files && files.length > 0) {
       const fd = new FormData()
@@ -137,6 +138,7 @@ export const kanbanApi = {
       if (model) fd.append('model', model)
       if (permissionMode) fd.append('permissionMode', permissionMode)
       if (busyAction) fd.append('busyAction', busyAction)
+      if (meta) fd.append('meta', 'true')
       for (const file of files) fd.append('files', file)
       return postFormData<ExecuteIssueResponse>(
         `/api/projects/${projectId}/issues/${issueId}/follow-up`,
@@ -150,6 +152,7 @@ export const kanbanApi = {
         ...(model ? { model } : {}),
         ...(permissionMode ? { permissionMode } : {}),
         ...(busyAction ? { busyAction } : {}),
+        ...(meta ? { meta: true } : {}),
       },
     )
   },

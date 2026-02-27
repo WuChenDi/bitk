@@ -71,7 +71,8 @@
     "addDescription": "Add a description...",
     "clickToEdit": "Click to edit",
     "devMode": "Dev Mode",
-    "dev": "Dev"
+    "dev": "Dev",
+    "autoTitle": "Auto-generate title"
   },
   "createIssue": {
     "model": "Model",

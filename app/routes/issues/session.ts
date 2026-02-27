@@ -256,6 +256,7 @@ async function parseFollowUpBody(c: {
       model?: string
       permissionMode?: string
       busyAction?: string
+      meta?: boolean
       files: File[]
     }
   | { ok: false; error: string }
@@ -270,6 +271,7 @@ async function parseFollowUpBody(c: {
     const model = fd.get('model')
     const permissionMode = fd.get('permissionMode')
     const busyAction = fd.get('busyAction')
+    const meta = fd.get('meta')
     const files: File[] = []
     for (const entry of fd.getAll('files')) {
       if (entry instanceof File) files.push(entry)
@@ -280,6 +282,7 @@ async function parseFollowUpBody(c: {
       model: typeof model === 'string' ? model : undefined,
       permissionMode: typeof permissionMode === 'string' ? permissionMode : undefined,
       busyAction: typeof busyAction === 'string' ? busyAction : undefined,
+      meta: meta === 'true' || meta === '1' ? true : undefined,
       files,
     }
   }
@@ -338,11 +341,14 @@ session.post('/:id/follow-up', async (c) => {
   const attachmentsMeta =
     savedFiles.length > 0 ? { attachments: savedFiles.map(savedFileToMeta) } : {}
 
+  const metaFlag = parsed.meta ? { meta: true } : {}
+
   // Queue message for todo/done issues instead of rejecting
   if (issue.statusId === 'todo') {
     const messageId = await persistPendingMessage(issueId, prompt, {
       pending: true,
       ...attachmentsMeta,
+      ...metaFlag,
     })
     if (savedFiles.length > 0) await insertAttachmentRecords(issueId, messageId, savedFiles)
     return c.json({ success: true, data: { issueId, messageId, queued: true } })
@@ -351,6 +357,7 @@ session.post('/:id/follow-up', async (c) => {
     const messageId = await persistPendingMessage(issueId, prompt, {
       done: true,
       ...attachmentsMeta,
+      ...metaFlag,
     })
     if (savedFiles.length > 0) await insertAttachmentRecords(issueId, messageId, savedFiles)
     return c.json({ success: true, data: { issueId, messageId, queued: true } })
@@ -362,6 +369,7 @@ session.post('/:id/follow-up', async (c) => {
     const messageId = await persistPendingMessage(issueId, prompt, {
       pending: true,
       ...attachmentsMeta,
+      ...metaFlag,
     })
     if (savedFiles.length > 0) await insertAttachmentRecords(issueId, messageId, savedFiles)
     logger.debug(
@@ -380,6 +388,11 @@ session.post('/:id/follow-up', async (c) => {
       issueId,
       fullPrompt,
     )
+    const followUpMeta: Record<string, unknown> = {
+      ...attachmentsMeta,
+      ...(parsed.meta ? { meta: true } : {}),
+    }
+    const hasFollowUpMeta = Object.keys(followUpMeta).length > 0
     const result = await issueEngine.followUpIssue(
       issueId,
       effectivePrompt,
@@ -387,7 +400,7 @@ session.post('/:id/follow-up', async (c) => {
       parsed.permissionMode as 'auto' | 'supervised' | 'plan' | undefined,
       parsed.busyAction as 'queue' | 'cancel' | undefined,
       savedFiles.length > 0 ? prompt || undefined : undefined,
-      savedFiles.length > 0 ? { ...attachmentsMeta } : undefined,
+      hasFollowUpMeta ? followUpMeta : undefined,
     )
     await markPendingMessagesDispatched(pendingIds)
 

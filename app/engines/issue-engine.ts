@@ -14,10 +14,12 @@ import { ulid } from 'ulid'
 import { db } from '../db'
 import { getPendingMessages, markPendingMessagesDispatched } from '../db/pending-messages'
 import {
+  issues as issuesTable,
   issueLogs as logsTable,
   projects as projectsTable,
   issuesLogsToolsCall as toolsTable,
 } from '../db/schema'
+import { emitIssueUpdated } from '../events/issue-events'
 import { logger } from '../logger'
 import { autoMoveToReview, getIssueWithSession, updateIssueSession } from './engine-store'
 import { engineRegistry } from './executors'
@@ -45,12 +47,16 @@ interface ManagedProcess {
    *  but the subprocess is still alive (conversational engines). Prevents monitorCompletion()
    *  from re-settling on exit, and is reset when a new turn starts. */
   turnSettled: boolean
+  /** True when the current turn was initiated by a meta follow-up (e.g. auto-title).
+   *  All log entries in this turn will be tagged with `meta: true` and suppressed from the frontend. */
+  metaTurn: boolean
   worktreePath?: string
   pendingInputs: Array<{
     prompt: string
     model?: string
     permissionMode?: PermissionPolicy
     busyAction: 'queue' | 'cancel'
+    metadata?: Record<string, unknown>
   }>
 }
 
@@ -71,6 +77,10 @@ const MAX_CONCURRENT_EXECUTIONS = Number(process.env.MAX_CONCURRENT_EXECUTIONS) 
 function isFrontendSuppressedEntry(entry: NormalizedLogEntry): boolean {
   // Hide dispatched pending messages (pending was set to false after engine consumed them)
   if (entry.metadata?.pending === false) return true
+  // Hide meta entries (auto-title and other internal AI interactions)
+  if (entry.metadata?.meta === true) return true
+  // Hide error-message entries from frontend (logs API + SSE)
+  if (entry.entryType === 'error-message') return true
   if (entry.entryType !== 'system-message') return false
   const subtype = entry.metadata?.subtype
   if (subtype === 'init') return true
@@ -380,7 +390,13 @@ export class IssueEngine {
         // If process is canceling/spawning or a turn is in progress, queue user input
         // and process it only after the current turn/process boundary is reached.
         if (active.state !== 'running' || active.turnInFlight) {
-          active.pendingInputs.push({ prompt, model: effectiveModel, permissionMode, busyAction })
+          active.pendingInputs.push({
+            prompt,
+            model: effectiveModel,
+            permissionMode,
+            busyAction,
+            metadata,
+          })
           logger.debug(
             {
               issueId,
@@ -708,6 +724,7 @@ export class IssueEngine {
       logicalFailure: false,
       cancelledByUser: false,
       turnSettled: false,
+      metaTurn: false,
       worktreePath,
       pendingInputs: [],
     }
@@ -1181,6 +1198,7 @@ export class IssueEngine {
     managed.logicalFailure = false
     managed.logicalFailureReason = undefined
     managed.cancelledByUser = false
+    managed.metaTurn = metadata?.meta === true
     const messageId = this.persistUserMessage(
       issueId,
       managed.executionId,
@@ -1194,6 +1212,7 @@ export class IssueEngine {
         executionId: managed.executionId,
         pid: this.getPidFromManaged(managed),
         promptChars: prompt.length,
+        metaTurn: managed.metaTurn,
       },
       'issue_process_input_sent',
     )
@@ -1215,10 +1234,32 @@ export class IssueEngine {
         if (!managed) break
         const turnIdx = this.turnIndexes.get(executionId) ?? 0
 
-        const entry = {
+        const entry: NormalizedLogEntry = {
           ...rawEntry,
           turnIndex: turnIdx,
           timestamp: rawEntry.timestamp ?? new Date().toISOString(),
+        }
+
+        // Tag all entries in a meta turn so they are hidden from the frontend
+        if (managed.metaTurn) {
+          entry.metadata = { ...entry.metadata, meta: true }
+        }
+
+        // Intercept auto-title pattern from AI response in meta turns
+        if (managed.metaTurn && entry.entryType === 'assistant-message') {
+          const match = entry.content.match(/>>ISS(.+?)ISS<</)
+          if (match) {
+            const title = match[1].trim().slice(0, 200)
+            if (title) {
+              try {
+                db.update(issuesTable).set({ title }).where(eq(issuesTable.id, issueId)).run()
+                emitIssueUpdated(issueId, { title })
+                logger.info({ issueId, title }, 'auto_title_updated')
+              } catch (err) {
+                logger.warn({ issueId, err }, 'auto_title_update_failed')
+              }
+            }
+          }
         }
 
         // Claude may emit execution noise after interrupt (e.g. request aborted /
@@ -1317,15 +1358,25 @@ export class IssueEngine {
   private handleTurnCompleted(issueId: string, executionId: string): void {
     const managed = this.processes.get(executionId)
     if (!managed || managed.state !== 'running') return
+    const wasMetaTurn = managed.metaTurn
     managed.turnInFlight = false
     managed.queueCancelRequested = false
+    managed.metaTurn = false
     logger.debug(
-      { issueId, executionId, queued: managed.pendingInputs.length },
+      { issueId, executionId, queued: managed.pendingInputs.length, wasMetaTurn },
       'issue_turn_completed',
     )
 
     if (managed.pendingInputs.length > 0) {
       void this.flushQueuedInputs(issueId, managed)
+      return
+    }
+
+    // Meta turns (auto-title, etc.) are invisible side-effects.
+    // Keep the session status as 'running' and skip review transition
+    // so the issue stays in working and the subprocess remains usable.
+    if (wasMetaTurn) {
+      logger.info({ issueId, executionId }, 'meta_turn_completed_skip_settle')
       return
     }
 
@@ -1398,7 +1449,7 @@ export class IssueEngine {
     if (next.model) {
       await updateIssueSession(issueId, { model: next.model })
     }
-    this.sendInputToRunningProcess(issueId, managed, next.prompt)
+    this.sendInputToRunningProcess(issueId, managed, next.prompt, undefined, next.metadata)
   }
 
   private async consumeStderr(
@@ -1524,6 +1575,8 @@ export class IssueEngine {
               first.prompt,
               first.model,
               first.permissionMode,
+              undefined,
+              first.metadata,
             )
             const nextManaged = this.processes.get(result.executionId)
             if (nextManaged && queued.length > 0) {
@@ -1827,7 +1880,7 @@ export class IssueEngine {
     }
 
     const turnIndex = this.getNextTurnIndex(issueId)
-    this.register(
+    const managed = this.register(
       executionId,
       issueId,
       spawned,
@@ -1835,6 +1888,9 @@ export class IssueEngine {
       turnIndex,
       worktreePath,
     )
+    if (metadata?.meta === true) {
+      managed.metaTurn = true
+    }
     const messageId = this.persistUserMessage(issueId, executionId, prompt, displayPrompt, metadata)
     this.monitorCompletion(executionId, issueId, engineType, false)
     logger.info(

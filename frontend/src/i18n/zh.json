@@ -71,7 +71,8 @@
     "addDescription": "添加描述...",
     "clickToEdit": "点击编辑",
     "devMode": "开发模式",
-    "dev": "Dev"
+    "dev": "Dev",
+    "autoTitle": "自动生成标题"
   },
   "createIssue": {
     "model": "模型",

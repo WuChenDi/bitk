@@ -1,5 +1,9 @@
 import { useRef } from 'react'
-import { useCancelIssue, useUpdateIssue } from '@/hooks/use-kanban'
+import {
+  useAutoTitleIssue,
+  useCancelIssue,
+  useUpdateIssue,
+} from '@/hooks/use-kanban'
 import { useIssueStream } from '@/hooks/use-issue-stream'
 import { STATUS_MAP } from '@/lib/statuses'
 import type { Issue, NormalizedLogEntry } from '@/types/kanban'
@@ -122,6 +126,7 @@ export function ChatBody({
 
   const updateIssue = useUpdateIssue(projectId)
   const cancelIssue = useCancelIssue(projectId)
+  const autoTitle = useAutoTitleIssue(projectId)
 
   const { logs, isThinking, workingStep, isTodo, isDone, appendServerMessage } =
     useSessionState(projectId, issueId, issue)
@@ -148,6 +153,8 @@ export function ChatBody({
         issue={issue}
         status={STATUS_MAP.get(issue.statusId)}
         onUpdate={(fields) => updateIssue.mutate({ id: issueId, ...fields })}
+        onAutoTitle={() => autoTitle.mutate(issueId)}
+        isAutoTitling={autoTitle.isPending}
       />
 
       {/* Input */}

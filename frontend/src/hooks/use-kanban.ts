@@ -269,6 +269,34 @@ export function useFollowUpIssue(projectId: string) {
   })
 }
 
+const AUTO_TITLE_PROMPT =
+  '请总结当前会话为一个简短的标题（10字以内），只返回固定格式 >>ISS + 标题 + ISS<< 不要返回其他内容'
+
+export function useAutoTitleIssue(projectId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (issueId: string) =>
+      kanbanApi.followUpIssue(
+        projectId,
+        issueId,
+        AUTO_TITLE_PROMPT,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        true,
+      ),
+    onSuccess: (_data, issueId) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.issue(projectId, issueId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.issues(projectId),
+      })
+    },
+  })
+}
+
 export function useRestartIssue(projectId: string) {
   const queryClient = useQueryClient()
   return useMutation({
