@@ -1,24 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import DOMPurify from 'dompurify'
 import MarkdownIt from 'markdown-it'
-import type Shiki from '@shikijs/markdown-it'
+import type { PluginSimple } from 'markdown-it'
 
 // ---------- Lazy Shiki plugin ----------
 
-let shikiPlugin: ReturnType<typeof Shiki> | null = null
-let shikiLoading: Promise<ReturnType<typeof Shiki>> | null = null
+let resolvedPlugin: PluginSimple | null = null
+let pluginLoading: Promise<PluginSimple> | null = null
 
-async function getShikiPlugin() {
-  if (shikiPlugin) return shikiPlugin
-  if (!shikiLoading) {
-    shikiLoading = (async () => {
-      const { default: fromHighlighter } = await import('@shikijs/markdown-it')
-      const { createHighlighter } = await import('shiki')
-      const hl = await createHighlighter({
-        themes: ['github-light-default', 'github-dark-default'],
-        langs: [],
-      })
-      const plugin = fromHighlighter(hl, {
+function loadShikiPlugin(): Promise<PluginSimple> {
+  if (resolvedPlugin) return Promise.resolve(resolvedPlugin)
+  if (!pluginLoading) {
+    pluginLoading = (async () => {
+      const { default: Shiki } = await import('@shikijs/markdown-it')
+      const plugin = await Shiki({
         themes: {
           light: 'github-light-default',
           dark: 'github-dark-default',
@@ -26,31 +21,34 @@ async function getShikiPlugin() {
         defaultColor: false,
         fallbackLanguage: 'text',
       })
-      shikiPlugin = plugin
+      resolvedPlugin = plugin
       return plugin
     })()
   }
-  return shikiLoading
+  return pluginLoading
 }
 
 // ---------- markdown-it (zero mode: table + fence only) ----------
 
-function createBaseRenderer(): MarkdownIt {
+const ENABLED_RULES = [
+  // block
+  'table',
+  'fence',
+  'code',
+  // inline (needed by table cells)
+  'text',
+  'newline',
+  'escape',
+  'backticks',
+  'emphasis',
+  'strikethrough',
+]
+
+function renderMarkdown(content: string): string {
   const md = new MarkdownIt('zero')
-  md.enable([
-    // block rules
-    'table',
-    'fence',
-    'code',
-    // inline rules needed by table cells
-    'text',
-    'newline',
-    'escape',
-    'backticks',
-    'emphasis',
-    'strikethrough',
-  ])
-  return md
+  md.enable(ENABLED_RULES)
+  if (resolvedPlugin) md.use(resolvedPlugin)
+  return md.render(content)
 }
 
 // ---------- Component ----------
@@ -62,29 +60,23 @@ export function MarkdownContent({
   content: string
   className?: string
 }) {
-  const [shikiReady, setShikiReady] = useState(!!shikiPlugin)
-  const [, bump] = useState(0)
+  const [shikiReady, setShikiReady] = useState(!!resolvedPlugin)
 
-  // Load Shiki plugin once
   useEffect(() => {
     if (shikiReady) return
     let cancelled = false
-    getShikiPlugin().then(() => {
-      if (!cancelled) {
-        setShikiReady(true)
-        bump((n) => n + 1)
-      }
+    loadShikiPlugin().then(() => {
+      if (!cancelled) setShikiReady(true)
     })
     return () => {
       cancelled = true
     }
   }, [shikiReady])
 
-  const html = useMemo(() => {
-    const md = createBaseRenderer()
-    if (shikiPlugin) md.use(shikiPlugin)
-    return md.render(content)
-  }, [content, shikiReady])
+  const html = useMemo(
+    () => renderMarkdown(content),
+    [content, shikiReady],
+  )
 
   if (!html.trim()) {
     return (
