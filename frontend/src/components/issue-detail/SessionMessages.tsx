@@ -411,13 +411,70 @@ export function SessionMessages({
 
   // Track which result indices have been consumed by a tool-call pairing
   const consumedResults = new Set<number>()
+  // Build a map: command user-message index → command_output index
+  const commandOutputByIdx = new Map<number, number>()
+  for (let i = 0; i < visibleLogs.length; i++) {
+    const entry = visibleLogs[i]
+    if (
+      entry.entryType === 'user-message' &&
+      entry.metadata?.type === 'command'
+    ) {
+      // Find the next command_output in the same turn
+      for (let j = i + 1; j < visibleLogs.length; j++) {
+        const candidate = visibleLogs[j]
+        if (
+          candidate.entryType === 'system-message' &&
+          candidate.metadata?.subtype === 'command_output'
+        ) {
+          commandOutputByIdx.set(i, j)
+          break
+        }
+      }
+    }
+  }
+  const consumedCommandOutputs = new Set(commandOutputByIdx.values())
+
   const rows: React.ReactNode[] = []
 
   for (let i = 0; i < visibleLogs.length; i++) {
     const entry = visibleLogs[i]
 
+    // Skip command_output entries consumed by a command group
+    if (consumedCommandOutputs.has(i)) continue
+
     // Skip result entries that were already rendered as part of a tool-call group
     if (consumedResults.has(i)) continue
+
+    // Group command user-messages with their output
+    if (
+      entry.entryType === 'user-message' &&
+      entry.metadata?.type === 'command'
+    ) {
+      const outputIdx = commandOutputByIdx.get(i)
+      const output = outputIdx !== undefined ? visibleLogs[outputIdx] : null
+      rows.push(
+        <div
+          key={`cmd-group-${entry.messageId ?? `${entry.turnIndex ?? 0}-${i}`}`}
+          className="mx-5 my-1.5 animate-message-enter"
+        >
+          <details className="rounded-lg border border-border/30 bg-muted/10 transition-all duration-200 open:bg-muted/20">
+            <summary className="cursor-pointer list-none px-3 py-2 text-xs text-muted-foreground hover:bg-muted/20 transition-colors">
+              <code className="font-mono text-foreground/70">
+                {entry.content}
+              </code>
+            </summary>
+            {output ? (
+              <div className="px-3 pb-3 pt-1.5 border-t border-border/20">
+                <pre className="text-xs text-foreground/80 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">
+                  {output.content}
+                </pre>
+              </div>
+            ) : null}
+          </details>
+        </div>,
+      )
+      continue
+    }
 
     const callId = entry.metadata?.toolCallId
     const isToolCall =

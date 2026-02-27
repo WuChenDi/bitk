@@ -384,9 +384,10 @@ session.post('/:id/follow-up', async (c) => {
       issueId,
       fullPrompt,
     )
+    const isCommand = prompt.startsWith('/')
     const followUpMeta: Record<string, unknown> = {
       ...attachmentsMeta,
-      ...(parsed.meta ? { type: 'system' } : {}),
+      ...(parsed.meta ? { type: 'system' } : isCommand ? { type: 'command' } : {}),
     }
     const hasFollowUpMeta = Object.keys(followUpMeta).length > 0
     const result = await issueEngine.followUpIssue(

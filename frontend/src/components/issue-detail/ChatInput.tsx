@@ -209,6 +209,7 @@ export function ChatInput({
                 size: f.size,
               }))
             : undefined
+        const isCommand = prompt.startsWith('/')
         const metadata: Record<string, unknown> | undefined = isTodo
           ? {
               type: 'pending',
@@ -221,9 +222,11 @@ export function ChatInput({
                   type: 'pending',
                   ...(filesMeta ? { attachments: filesMeta } : {}),
                 }
-              : filesMeta
-                ? { attachments: filesMeta }
-                : undefined
+              : isCommand
+                ? { type: 'command' }
+                : filesMeta
+                  ? { attachments: filesMeta }
+                  : undefined
         onMessageSent?.(result.messageId, prompt, metadata)
       }
     } catch (err) {
