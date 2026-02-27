@@ -469,6 +469,11 @@
   - createdAt: 2026-02-27 01:30
   - owner: claude
 
+- [x] **UI-014 Move language and theme settings into settings dialog** `P2`
+  - description: Moved language selector and theme toggle from the sidebar into AppSettingsDialog. Removed standalone LanguageSelector and ThemeToggle components from AppSidebar and MobileSidebar. Mobile sidebar now has a Settings button that opens the same dialog.
+  - activeForm: Moving language/theme to settings dialog
+  - createdAt: 2026-02-27 12:00
+
 - [-] **BUG-080 Fix duplicate Claude process spawning for same session** `P0`
   - description: `handleTurnCompleted()` sets `managed.state = 'completed'` while the subprocess is still alive (conversational engines keep process running between turns). `getActiveProcessForIssue()` only finds `running`/`spawning` states, so follow-up calls spawn a new `--resume` process, creating duplicate processes for the same session. Fix: keep `managed.state = 'running'` after turn completes (subprocess IS alive), add `turnSettled` flag for DB/event handling, and add safety guard in `spawnFollowUpProcess()` to kill old processes.
   - activeForm: Fixing duplicate Claude process spawning

@@ -1,13 +1,9 @@
 import { useRef, useState, useCallback } from 'react'
 import {
-  Globe,
   LayoutGrid,
   List,
-  Monitor,
-  Moon,
   Plus,
   Settings,
-  Sun,
   TerminalSquare,
   Wifi,
   WifiOff,
@@ -22,11 +18,9 @@ import { Separator } from '@/components/ui/separator'
 import { CreateProjectDialog } from '@/components/CreateProjectDialog'
 import { AppSettingsDialog } from '@/components/AppSettingsDialog'
 import { AppLogo } from '@/components/AppLogo'
-import { useTheme } from '@/hooks/use-theme'
 import { useViewModeStore } from '@/stores/view-mode-store'
 import { useClickOutside } from '@/hooks/use-click-outside'
 import { getProjectInitials } from '@/lib/format'
-import { LANGUAGES } from '@/lib/constants'
 import { useTerminalStore } from '@/stores/terminal-store'
 
 function ProjectButton({
@@ -152,25 +146,10 @@ export function AppSidebar({ activeProjectId }: { activeProjectId: string }) {
         onCreated={handleProjectCreated}
       />
 
+      <Separator className="mx-2 my-0.5 w-8" />
+
       {/* Bottom section */}
       <div className="mt-auto flex flex-col items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleTerminal}
-          className="relative h-9 w-9 text-muted-foreground"
-          aria-label={t('terminal.title')}
-          title={t('terminal.title')}
-        >
-          <TerminalSquare className="h-4 w-4" />
-          {isTerminalMinimized && (
-            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary" />
-          )}
-        </Button>
-        <ViewModeToggle />
-        <Separator className="mx-2 my-0.5 w-8" />
-        <LanguageSelector />
-        <ThemeToggle />
         <div
           className={`flex items-center justify-center h-9 w-9 ${connected ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}
           title={connected ? t('session.connected') : t('session.disconnected')}
@@ -184,6 +163,20 @@ export function AppSidebar({ activeProjectId }: { activeProjectId: string }) {
         <Button
           variant="ghost"
           size="icon"
+          onClick={toggleTerminal}
+          className="relative h-9 w-9 text-muted-foreground"
+          aria-label={t('terminal.title')}
+          title={t('terminal.title')}
+        >
+          <TerminalSquare className="h-4 w-4" />
+          {isTerminalMinimized && (
+            <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary" />
+          )}
+        </Button>
+        <ViewModeToggle activeProjectId={activeProjectId} />
+        <Button
+          variant="ghost"
+          size="icon"
           className="h-9 w-9 text-muted-foreground"
           aria-label={t('sidebar.settings')}
           title={t('sidebar.settings')}
@@ -193,102 +186,6 @@ export function AppSidebar({ activeProjectId }: { activeProjectId: string }) {
         </Button>
         <AppSettingsDialog open={showSettings} onOpenChange={setShowSettings} />
       </div>
-    </div>
-  )
-}
-
-function LanguageSelector() {
-  const { t, i18n } = useTranslation()
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  useClickOutside(ref, open, () => setOpen(false))
-
-  const current = LANGUAGES.find((l) => l.id === i18n.language) ?? LANGUAGES[0]
-
-  return (
-    <div ref={ref} className="relative">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-9 w-9 text-muted-foreground"
-        aria-label={t('language.switchLanguage')}
-        title={current.label}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <Globe className="h-4 w-4" />
-      </Button>
-      {open ? (
-        <div className="absolute left-full bottom-0 ml-2 z-[100] min-w-[120px] rounded-md border bg-popover py-1 shadow-lg">
-          {LANGUAGES.map((lang) => (
-            <button
-              key={lang.id}
-              type="button"
-              onClick={() => {
-                i18n.changeLanguage(lang.id)
-                setOpen(false)
-              }}
-              className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm transition-colors hover:bg-accent ${
-                lang.id === i18n.language ? 'bg-accent/50 font-medium' : ''
-              }`}
-            >
-              {lang.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-const THEME_OPTIONS = [
-  { id: 'system' as const, icon: Monitor, labelKey: 'theme.system' },
-  { id: 'light' as const, icon: Sun, labelKey: 'theme.light' },
-  { id: 'dark' as const, icon: Moon, labelKey: 'theme.dark' },
-]
-
-function ThemeToggle() {
-  const { t } = useTranslation()
-  const { theme, setTheme, resolved } = useTheme()
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  useClickOutside(ref, open, () => setOpen(false))
-
-  const CurrentIcon =
-    theme === 'system' ? Monitor : resolved === 'dark' ? Sun : Moon
-  const current = THEME_OPTIONS.find((o) => o.id === theme) ?? THEME_OPTIONS[0]
-
-  return (
-    <div ref={ref} className="relative">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-9 w-9 text-muted-foreground"
-        aria-label={t('theme.switchTheme')}
-        title={t(current.labelKey)}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <CurrentIcon className="h-4 w-4" />
-      </Button>
-      {open ? (
-        <div className="absolute left-full bottom-0 ml-2 z-[100] min-w-[120px] rounded-md border bg-popover py-1 shadow-lg">
-          {THEME_OPTIONS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => {
-                setTheme(opt.id)
-                setOpen(false)
-              }}
-              className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm transition-colors hover:bg-accent ${
-                opt.id === theme ? 'bg-accent/50 font-medium' : ''
-              }`}
-            >
-              <opt.icon className="h-3.5 w-3.5" />
-              {t(opt.labelKey)}
-            </button>
-          ))}
-        </div>
-      ) : null}
     </div>
   )
 }

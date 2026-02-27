@@ -1,17 +1,26 @@
 import { useRef } from 'react'
-import { X, Minus, Maximize2, Minimize2, Trash2 } from 'lucide-react'
+import { Minus, Maximize2, Minimize2, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   useTerminalStore,
   TERMINAL_MIN_HEIGHT,
   TERMINAL_MAX_HEIGHT_RATIO,
 } from '@/stores/terminal-store'
+import { useIsMobile } from '@/hooks/use-mobile'
 import { TerminalView, disposeTerminal } from './TerminalView'
 
 export function TerminalDrawer() {
   const { t } = useTranslation()
-  const { isOpen, isFullscreen, height, close, minimize, toggleFullscreen, setHeight } =
-    useTerminalStore()
+  const {
+    isOpen,
+    isFullscreen,
+    height,
+    close,
+    minimize,
+    toggleFullscreen,
+    setHeight,
+  } = useTerminalStore()
+  const isMobile = useIsMobile()
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null)
 
   if (!isOpen) return null
@@ -19,17 +28,19 @@ export function TerminalDrawer() {
   const viewportHeight =
     typeof window === 'undefined' ? 600 : window.innerHeight
   const maxHeight = Math.round(viewportHeight * TERMINAL_MAX_HEIGHT_RATIO)
-  const effectiveHeight = isFullscreen ? viewportHeight : height
+  // Mobile always fullscreen
+  const fullscreen = isMobile || isFullscreen
+  const effectiveHeight = fullscreen ? viewportHeight : height
 
   return (
     <div
       className={`fixed bottom-0 left-0 right-0 z-40 flex flex-col border-t border-border bg-[#1a1a2e] shadow-2xl ${
-        isFullscreen ? 'top-0' : ''
+        fullscreen ? 'top-0' : ''
       }`}
-      style={isFullscreen ? undefined : { height: effectiveHeight }}
+      style={fullscreen ? undefined : { height: effectiveHeight }}
     >
-      {/* Resize handle — hidden in fullscreen */}
-      {!isFullscreen && (
+      {/* Resize handle — hidden in fullscreen and on mobile */}
+      {!fullscreen && (
         <div
           role="separator"
           aria-orientation="horizontal"
@@ -84,28 +95,21 @@ export function TerminalDrawer() {
           >
             <Minus className="h-3.5 w-3.5" />
           </button>
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="p-1 rounded text-white/50 hover:text-white/80 hover:bg-white/10 transition-colors"
-            aria-label={t('terminal.maximize')}
-            title={isFullscreen ? t('terminal.back') : t('terminal.maximize')}
-          >
-            {isFullscreen ? (
-              <Minimize2 className="h-3.5 w-3.5" />
-            ) : (
-              <Maximize2 className="h-3.5 w-3.5" />
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={close}
-            className="p-1 rounded text-white/50 hover:text-white/80 hover:bg-white/10 transition-colors"
-            aria-label={t('terminal.close')}
-            title={t('terminal.close')}
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
+          {!isMobile && (
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="p-1 rounded text-white/50 hover:text-white/80 hover:bg-white/10 transition-colors"
+              aria-label={t('terminal.maximize')}
+              title={isFullscreen ? t('terminal.back') : t('terminal.maximize')}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 className="h-3.5 w-3.5" />
+              )}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {

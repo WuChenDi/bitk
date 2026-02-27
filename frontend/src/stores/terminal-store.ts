@@ -20,6 +20,7 @@ interface TerminalStore {
   isFullscreen: boolean
   height: number
   open: () => void
+  openFullscreen: () => void
   close: () => void
   toggle: () => void
   minimize: () => void
@@ -38,14 +39,16 @@ export const useTerminalStore = create<TerminalStore>((set) => ({
   height: Math.round(getViewportHeight() * DEFAULT_HEIGHT_RATIO),
 
   open: () => set({ isOpen: true, isMinimized: false }),
+  openFullscreen: () =>
+    set({ isOpen: true, isMinimized: false, isFullscreen: true }),
   close: () => set({ isOpen: false }),
   toggle: () =>
     set((s) => {
-      // If minimized, restore
       if (s.isMinimized) return { isOpen: true, isMinimized: false }
       return { isOpen: !s.isOpen }
     }),
-  minimize: () => set({ isOpen: false, isMinimized: true, isFullscreen: false }),
+  minimize: () =>
+    set({ isOpen: false, isMinimized: true, isFullscreen: false }),
   restore: () => set({ isOpen: true, isMinimized: false }),
   toggleFullscreen: () => set((s) => ({ isFullscreen: !s.isFullscreen })),
   setHeight: (h) => set({ height: clampHeight(h) }),

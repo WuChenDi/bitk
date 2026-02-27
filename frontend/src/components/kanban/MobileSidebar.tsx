@@ -1,9 +1,7 @@
 import {
-  Globe,
   Menu,
-  Moon,
   Plus,
-  Sun,
+  Settings,
   ChevronRight,
   TerminalSquare,
 } from 'lucide-react'
@@ -12,14 +10,14 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { Project } from '@/types/kanban'
 import { useProjects } from '@/hooks/use-kanban'
-import { useTheme } from '@/hooks/use-theme'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { CreateProjectDialog } from '@/components/CreateProjectDialog'
+import { AppSettingsDialog } from '@/components/AppSettingsDialog'
 import { AppLogo } from '@/components/AppLogo'
 import { getProjectInitials } from '@/lib/format'
-import { LANGUAGES } from '@/lib/constants'
+import { useTerminalStore } from '@/stores/terminal-store'
 
 export function MobileSidebarTrigger({ onOpen }: { onOpen: () => void }) {
   const { t } = useTranslation()
@@ -42,12 +40,11 @@ export function MobileSidebar({
   activeProjectId: string
 }) {
   const [open, setOpen] = useState(false)
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { data: projects } = useProjects()
-  const { resolved, toggle } = useTheme()
   const [showCreate, setShowCreate] = useState(false)
-  const [langExpanded, setLangExpanded] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   // Mobile always uses list mode
   const mobileProjectPath = useCallback(
@@ -63,9 +60,6 @@ export function MobileSidebar({
     },
     [navigate, mobileProjectPath],
   )
-
-  const currentLang =
-    LANGUAGES.find((l) => l.id === i18n.language) ?? LANGUAGES[0]
 
   return (
     <>
@@ -150,69 +144,25 @@ export function MobileSidebar({
 
               <Separator />
 
-              {/* Terminal */}
+              {/* Functional buttons grouped together */}
               <button
                 type="button"
                 onClick={() => {
                   setOpen(false)
-                  navigate('/terminal')
+                  useTerminalStore.getState().openFullscreen()
                 }}
                 className="flex items-center gap-3 w-full px-4 min-h-[44px] text-sm text-foreground/80 hover:bg-accent/50 active:bg-accent transition-colors"
               >
                 <TerminalSquare className="h-4 w-4 text-muted-foreground" />
                 {t('terminal.title')}
               </button>
-
-              <Separator />
-
-              {/* Language */}
               <button
                 type="button"
-                onClick={() => setLangExpanded((v) => !v)}
+                onClick={() => setShowSettings(true)}
                 className="flex items-center gap-3 w-full px-4 min-h-[44px] text-sm text-foreground/80 hover:bg-accent/50 active:bg-accent transition-colors"
               >
-                <Globe className="h-4 w-4 text-muted-foreground" />
-                <span>{t('language.switchLanguage')}</span>
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {currentLang.label}
-                </span>
-              </button>
-              {langExpanded ? (
-                <div className="bg-accent/20 px-4">
-                  {LANGUAGES.map((lang) => (
-                    <button
-                      key={lang.id}
-                      type="button"
-                      onClick={() => {
-                        i18n.changeLanguage(lang.id)
-                        setLangExpanded(false)
-                      }}
-                      className={`flex items-center gap-3 w-full pl-7 min-h-[40px] text-sm transition-colors hover:bg-accent/50 active:bg-accent ${
-                        lang.id === i18n.language
-                          ? 'text-primary font-medium'
-                          : 'text-foreground/70'
-                      }`}
-                    >
-                      {lang.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-
-              {/* Theme */}
-              <button
-                type="button"
-                onClick={toggle}
-                className="flex items-center gap-3 w-full px-4 min-h-[44px] text-sm text-foreground/80 hover:bg-accent/50 active:bg-accent transition-colors"
-              >
-                {resolved === 'dark' ? (
-                  <Sun className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <Moon className="h-4 w-4 text-muted-foreground" />
-                )}
-                {resolved === 'dark'
-                  ? t('theme.switchToLight')
-                  : t('theme.switchToDark')}
+                <Settings className="h-4 w-4 text-muted-foreground" />
+                {t('sidebar.settings')}
               </button>
             </div>
           </div>
@@ -223,6 +173,7 @@ export function MobileSidebar({
         onOpenChange={setShowCreate}
         onCreated={handleProjectCreated}
       />
+      <AppSettingsDialog open={showSettings} onOpenChange={setShowSettings} />
     </>
   )
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useRef, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Check,
@@ -31,8 +31,17 @@ import type {
   EngineProfile,
 } from '@/types/kanban'
 import { cn } from '@/lib/utils'
+import { LANGUAGES } from '@/lib/constants'
+import { useTheme } from '@/hooks/use-theme'
+import { useClickOutside } from '@/hooks/use-click-outside'
 import { DirectoryPicker } from '@/components/DirectoryPicker'
 import { EngineIcon } from '@/components/EngineIcons'
+
+const THEME_OPTIONS = [
+  { id: 'system' as const, labelKey: 'theme.system' },
+  { id: 'light' as const, labelKey: 'theme.light' },
+  { id: 'dark' as const, labelKey: 'theme.dark' },
+]
 
 export function AppSettingsDialog({
   open,
@@ -41,7 +50,8 @@ export function AppSettingsDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const { theme, setTheme } = useTheme()
   const { data: discovery, isLoading: enginesLoading } =
     useEngineAvailability(open)
   const engines = discovery?.engines
@@ -105,6 +115,33 @@ export function AppSettingsDialog({
               initialPath={wsData?.path ?? '/'}
               onSelect={handleSelectWorkspace}
             />
+          </div>
+
+          {/* Language & Theme */}
+          <div className="mb-4 grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                {t('settings.language')}
+              </label>
+              <SettingsSelect
+                value={i18n.language}
+                options={LANGUAGES.map((l) => ({ id: l.id, label: l.label }))}
+                onChange={(id) => i18n.changeLanguage(id)}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                {t('settings.appearance')}
+              </label>
+              <SettingsSelect
+                value={theme}
+                options={THEME_OPTIONS.map((o) => ({
+                  id: o.id,
+                  label: t(o.labelKey),
+                }))}
+                onChange={(id) => setTheme(id as 'system' | 'light' | 'dark')}
+              />
+            </div>
           </div>
 
           {/* Default Engine */}
@@ -330,6 +367,62 @@ function EngineCard({
               </button>
             )
           })}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function SettingsSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string
+  options: { id: string; label: string }[]
+  onChange: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useClickOutside(ref, open, () => setOpen(false))
+
+  const selected = options.find((o) => o.id === value) ?? options[0]
+
+  return (
+    <div ref={ref} className="relative mt-1.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm transition-colors hover:bg-accent/50"
+      >
+        <span className="truncate">{selected.label}</span>
+        <ChevronDown
+          className={cn(
+            'h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform',
+            open && 'rotate-180',
+          )}
+        />
+      </button>
+      {open ? (
+        <div className="absolute left-0 right-0 top-full mt-1 z-[60] rounded-lg border bg-popover py-1 shadow-lg">
+          {options.map((opt) => (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => {
+                onChange(opt.id)
+                setOpen(false)
+              }}
+              className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm transition-colors hover:bg-accent ${
+                opt.id === value ? 'bg-accent/50 font-medium' : ''
+              }`}
+            >
+              {opt.label}
+              {opt.id === value ? (
+                <Check className="h-3 w-3 ml-auto shrink-0" />
+              ) : null}
+            </button>
+          ))}
         </div>
       ) : null}
     </div>

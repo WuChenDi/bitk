@@ -1,17 +1,14 @@
 import { useNavigate } from 'react-router-dom'
 import {
-  Globe,
   LayoutGrid,
   List,
   Plus,
   Hash,
   Layers,
   Menu,
-  Monitor,
-  Moon,
-  Sun,
   MoreVertical,
   Settings,
+  TerminalSquare,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useProjects } from '@/hooks/use-kanban'
@@ -26,13 +23,12 @@ import { ProjectSettingsDialog } from '@/components/ProjectSettingsDialog'
 import { AppSettingsDialog } from '@/components/AppSettingsDialog'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { useState, useCallback, useRef } from 'react'
-import { useTheme } from '@/hooks/use-theme'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { AppLogo } from '@/components/AppLogo'
 import { useViewModeStore } from '@/stores/view-mode-store'
 import { useClickOutside } from '@/hooks/use-click-outside'
 import { getProjectInitials } from '@/lib/format'
-import { LANGUAGES } from '@/lib/constants'
+import { useTerminalStore } from '@/stores/terminal-store'
 
 function ProjectCard({
   project,
@@ -104,12 +100,6 @@ function ProjectCard({
 
 /* -- Mobile menu sheet (right-side) -------------------- */
 
-const THEME_OPTIONS = [
-  { id: 'system' as const, icon: Monitor, labelKey: 'theme.system' },
-  { id: 'light' as const, icon: Sun, labelKey: 'theme.light' },
-  { id: 'dark' as const, icon: Moon, labelKey: 'theme.dark' },
-]
-
 function MobileHomeMenu({
   onCreateProject,
   onOpenSettings,
@@ -117,15 +107,8 @@ function MobileHomeMenu({
   onCreateProject: () => void
   onOpenSettings: () => void
 }) {
-  const { t, i18n } = useTranslation()
-  const { theme, setTheme } = useTheme()
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const [langExpanded, setLangExpanded] = useState(false)
-  const [themeExpanded, setThemeExpanded] = useState(false)
-  const currentThemeOpt =
-    THEME_OPTIONS.find((o) => o.id === theme) ?? THEME_OPTIONS[0]
-  const currentLang =
-    LANGUAGES.find((l) => l.id === i18n.language) ?? LANGUAGES[0]
 
   return (
     <>
@@ -163,78 +146,20 @@ function MobileHomeMenu({
 
               <Separator />
 
-              {/* Language */}
+              {/* Terminal */}
               <button
                 type="button"
-                onClick={() => setLangExpanded((v) => !v)}
+                onClick={() => {
+                  setOpen(false)
+                  useTerminalStore.getState().openFullscreen()
+                }}
                 className="flex items-center gap-3 w-full px-4 min-h-[48px] text-sm text-foreground/80 hover:bg-accent/50 active:bg-accent transition-colors"
               >
-                <Globe className="h-4.5 w-4.5 text-muted-foreground" />
-                <span>{t('language.switchLanguage')}</span>
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {currentLang.label}
-                </span>
+                <TerminalSquare className="h-4.5 w-4.5 text-muted-foreground" />
+                {t('terminal.title')}
               </button>
-              {langExpanded ? (
-                <div className="bg-accent/20 px-4">
-                  {LANGUAGES.map((lang) => (
-                    <button
-                      key={lang.id}
-                      type="button"
-                      onClick={() => {
-                        i18n.changeLanguage(lang.id)
-                        setLangExpanded(false)
-                      }}
-                      className={`flex items-center gap-3 w-full pl-8 min-h-[44px] text-sm transition-colors hover:bg-accent/50 active:bg-accent ${
-                        lang.id === i18n.language
-                          ? 'text-primary font-medium'
-                          : 'text-foreground/70'
-                      }`}
-                    >
-                      {lang.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
 
-              {/* Theme */}
-              <button
-                type="button"
-                onClick={() => setThemeExpanded((v) => !v)}
-                className="flex items-center gap-3 w-full px-4 min-h-[48px] text-sm text-foreground/80 hover:bg-accent/50 active:bg-accent transition-colors"
-              >
-                <currentThemeOpt.icon className="h-4.5 w-4.5 text-muted-foreground" />
-                <span>{t('theme.switchTheme')}</span>
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {t(currentThemeOpt.labelKey)}
-                </span>
-              </button>
-              {themeExpanded ? (
-                <div className="bg-accent/20 px-4">
-                  {THEME_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => {
-                        setTheme(opt.id)
-                        setThemeExpanded(false)
-                      }}
-                      className={`flex items-center gap-3 w-full pl-8 min-h-[44px] text-sm transition-colors hover:bg-accent/50 active:bg-accent ${
-                        opt.id === theme
-                          ? 'text-primary font-medium'
-                          : 'text-foreground/70'
-                      }`}
-                    >
-                      <opt.icon className="h-3.5 w-3.5" />
-                      {t(opt.labelKey)}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-
-              <Separator />
-
-              {/* Agents */}
+              {/* Settings */}
               <button
                 type="button"
                 onClick={() => {
@@ -263,20 +188,7 @@ function DesktopHeaderControls({
   onCreateProject: () => void
   onOpenSettings: () => void
 }) {
-  const { t, i18n } = useTranslation()
-  const { theme, setTheme, resolved } = useTheme()
-  const [langOpen, setLangOpen] = useState(false)
-  const langRef = useRef<HTMLDivElement>(null)
-  useClickOutside(langRef, langOpen, () => setLangOpen(false))
-
-  const [themeOpen, setThemeOpen] = useState(false)
-  const themeRef = useRef<HTMLDivElement>(null)
-  useClickOutside(themeRef, themeOpen, () => setThemeOpen(false))
-  const ThemeIcon =
-    theme === 'system' ? Monitor : resolved === 'dark' ? Sun : Moon
-
-  const currentLang =
-    LANGUAGES.find((l) => l.id === i18n.language) ?? LANGUAGES[0]
+  const { t } = useTranslation()
 
   const { mode, setMode } = useViewModeStore()
   const [viewOpen, setViewOpen] = useState(false)
@@ -332,68 +244,15 @@ function DesktopHeaderControls({
         ) : null}
       </div>
 
-      <div ref={langRef} className="relative">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 gap-1.5 text-muted-foreground"
-          onClick={() => setLangOpen((v) => !v)}
-          aria-label={t('language.switchLanguage')}
-        >
-          <Globe className="h-4 w-4" />
-          <span className="text-xs">{currentLang.label}</span>
-        </Button>
-        {langOpen ? (
-          <div className="absolute right-0 top-full mt-1 z-[100] min-w-[120px] rounded-md border bg-popover py-1 shadow-lg">
-            {LANGUAGES.map((lang) => (
-              <button
-                key={lang.id}
-                type="button"
-                onClick={() => {
-                  i18n.changeLanguage(lang.id)
-                  setLangOpen(false)
-                }}
-                className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm transition-colors hover:bg-accent ${
-                  lang.id === i18n.language ? 'bg-accent/50 font-medium' : ''
-                }`}
-              >
-                {lang.label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
-      <div ref={themeRef} className="relative">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground"
-          onClick={() => setThemeOpen((v) => !v)}
-          aria-label={t('theme.switchTheme')}
-        >
-          <ThemeIcon className="h-4 w-4" />
-        </Button>
-        {themeOpen ? (
-          <div className="absolute right-0 top-full mt-1 z-[100] min-w-[120px] rounded-md border bg-popover py-1 shadow-lg">
-            {THEME_OPTIONS.map((opt) => (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => {
-                  setTheme(opt.id)
-                  setThemeOpen(false)
-                }}
-                className={`flex w-full items-center gap-2 px-3 py-1.5 text-sm transition-colors hover:bg-accent ${
-                  opt.id === theme ? 'bg-accent/50 font-medium' : ''
-                }`}
-              >
-                <opt.icon className="h-3.5 w-3.5" />
-                {t(opt.labelKey)}
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-muted-foreground"
+        onClick={useTerminalStore.getState().toggle}
+        aria-label={t('terminal.title')}
+      >
+        <TerminalSquare className="h-4 w-4" />
+      </Button>
       <Button
         variant="ghost"
         size="icon"
