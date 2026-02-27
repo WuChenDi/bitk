@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { serveStatic } from 'hono/bun'
 import app from './app'
 import { embeddedStatic } from './embedded-static'
-import { issueEngine } from './engines/issue-engine'
+import { issueEngine } from './engines/issue'
 import {
   registerSettledReconciliation,
   startPeriodicReconciliation,

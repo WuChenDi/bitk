@@ -13,17 +13,16 @@ import type {
   StateChangeCallback,
   UnsubscribeFn,
 } from './types'
-import { applyAutoTitle } from './title'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { db } from '../../db'
 import { getPendingMessages, markPendingMessagesDispatched } from '../../db/pending-messages'
-import { issues as issuesTable, issueLogs as logsTable } from '../../db/schema'
-import { emitIssueUpdated } from '../../events/issue-events'
+import { issueLogs as logsTable } from '../../db/schema'
 import { logger } from '../../logger'
 import { autoMoveToReview, getIssueWithSession, updateIssueSession } from '../engine-store'
 import { engineRegistry } from '../executors'
+import { ProcessManager } from '../process-manager'
 import { loadFilterRules } from '../write-filter'
 import {
   captureBaseCommitHash,
@@ -43,6 +42,7 @@ import {
   persistToolDetail,
 } from './persistence'
 import { consumeStderr, consumeStream } from './streams'
+import { applyAutoTitle } from './title'
 import {
   AUTO_CLEANUP_DELAY_MS,
   GC_INTERVAL_MS,
@@ -54,10 +54,15 @@ import {
 // ---------- IssueEngine ----------
 
 export class IssueEngine {
-  private processes = new Map<string, ManagedProcess>()
-  private issueActiveExecution = new Map<string, string>()
+  private pm = new ProcessManager<ManagedProcess>('issue', {
+    maxConcurrent: MAX_CONCURRENT_EXECUTIONS,
+    autoCleanupDelayMs: AUTO_CLEANUP_DELAY_MS,
+    gcIntervalMs: 0, // IssueEngine keeps its own domain GC
+    killTimeoutMs: 5000,
+    logger,
+  })
+
   private issueOpLocks = new Map<string, Promise<void>>()
-  private cleanupTimers = new Map<string, ReturnType<typeof setTimeout>>()
   private entryCounters = new Map<string, number>()
   private turnIndexes = new Map<string, number>()
   private userMessageIds = new Map<string, string>()
@@ -70,10 +75,18 @@ export class IssueEngine {
 
   constructor() {
     this.gcTimer = setInterval(() => this.gcSweep(), GC_INTERVAL_MS)
-    // Allow the process to exit without waiting for the GC timer
     if (this.gcTimer && typeof this.gcTimer === 'object' && 'unref' in this.gcTimer) {
       this.gcTimer.unref()
     }
+
+    // Sync PM auto-cleanup with domain data
+    this.pm.onStateChange((entry) => {
+      const state = entry.state
+      if (state === 'completed' || state === 'failed' || state === 'cancelled') {
+        // When PM auto-removes, clean domain data too
+        // (entryCounters, turnIndexes are cleaned on remove)
+      }
+    })
   }
 
   private getPidFromManaged(managed: ManagedProcess): number | undefined {
@@ -83,12 +96,6 @@ export class IssueEngine {
   private getPidFromSubprocess(subprocess: SpawnedProcess['subprocess']): number | undefined {
     const maybePid = (subprocess as { pid?: number }).pid
     return typeof maybePid === 'number' ? maybePid : undefined
-  }
-
-  private isProcessActive(p: ManagedProcess): boolean {
-    return (
-      p.state === 'running' || p.state === 'spawning' || (p.state === 'cancelled' && !p.finishedAt)
-    )
   }
 
   // ---- Orchestration ----
@@ -118,7 +125,6 @@ export class IssueEngine {
       setIssueDevMode(issueId, issue.devMode)
 
       this.ensureNoActiveProcess(issueId)
-      this.ensureConcurrencyLimit()
 
       const executor = engineRegistry.get(opts.engineType)
       if (!executor) throw new Error(`No executor for engine type: ${opts.engineType}`)
@@ -365,7 +371,6 @@ export class IssueEngine {
       if (!issue.sessionFields.prompt) throw new Error('No prompt set on issue')
 
       this.ensureNoActiveProcess(issueId)
-      this.ensureConcurrencyLimit()
 
       const engineType = issue.sessionFields.engineType
       const executor = engineRegistry.get(engineType)
@@ -500,7 +505,7 @@ export class IssueEngine {
   }
 
   getProcess(executionId: string): ManagedProcess | undefined {
-    return this.processes.get(executionId)
+    return this.pm.get(executionId)?.meta
   }
 
   /**
@@ -587,21 +592,23 @@ export class IssueEngine {
       pendingInputs: [],
     }
 
-    this.processes.set(executionId, managed)
-    this.issueActiveExecution.set(issueId, executionId)
+    this.pm.register(executionId, process.subprocess, managed, {
+      group: issueId,
+      startAsRunning: true,
+    })
     this.entryCounters.set(executionId, 0)
     this.turnIndexes.set(executionId, turnIndex)
     this.emitStateChange(issueId, executionId, 'running')
 
     const stdoutCallbacks: StreamCallbacks = {
-      getManaged: () => this.processes.get(executionId),
+      getManaged: () => this.pm.get(executionId)?.meta,
       getTurnIndex: () => this.turnIndexes.get(executionId) ?? 0,
       onEntry: (entry) => this.handleStreamEntry(issueId, executionId, entry),
       onTurnCompleted: () => this.handleTurnCompleted(issueId, executionId),
       onStreamError: (error) => this.handleStreamError(issueId, executionId, error),
     }
     const stderrCallbacks = {
-      getManaged: () => this.processes.get(executionId),
+      getManaged: () => this.pm.get(executionId)?.meta,
       getTurnIndex: () => this.turnIndexes.get(executionId) ?? 0,
       onEntry: (entry: NormalizedLogEntry) => this.handleStderrEntry(issueId, executionId, entry),
     }
@@ -617,24 +624,11 @@ export class IssueEngine {
   }
 
   private getActiveProcesses(): ManagedProcess[] {
-    return Array.from(this.processes.values()).filter((p) => this.isProcessActive(p))
+    return this.pm.getActive().map((e) => e.meta)
   }
 
   private getActiveProcessForIssue(issueId: string): ManagedProcess | undefined {
-    const indexedExecutionId = this.issueActiveExecution.get(issueId)
-    if (indexedExecutionId) {
-      const managed = this.processes.get(indexedExecutionId)
-      if (managed && this.isProcessActive(managed)) {
-        return managed
-      }
-      this.issueActiveExecution.delete(issueId)
-    }
-
-    const discovered = this.getActiveProcesses().find((p) => p.issueId === issueId)
-    if (discovered) {
-      this.issueActiveExecution.set(issueId, discovered.executionId)
-    }
-    return discovered
+    return this.pm.getFirstActiveInGroup(issueId)?.meta
   }
 
   private async withIssueLock<T>(issueId: string, fn: () => Promise<T>): Promise<T> {
@@ -661,8 +655,10 @@ export class IssueEngine {
     executionId: string,
     opts: { emitCancelledState?: boolean; hard?: boolean } = {},
   ): Promise<void> {
-    const managed = this.processes.get(executionId)
-    if (!managed || managed.state !== 'running') return
+    const entry = this.pm.get(executionId)
+    if (!entry) return
+    const managed = entry.meta
+    if (entry.state !== 'running') return
 
     logger.debug(
       {
@@ -687,38 +683,25 @@ export class IssueEngine {
       return
     }
 
+    // Hard cancel: delegate kill timeout to PM
     managed.state = 'cancelled'
     if (opts.emitCancelledState !== false) {
       this.emitStateChange(managed.issueId, executionId, 'cancelled')
     }
 
-    const killTimeout = setTimeout(() => {
-      try {
-        managed.process.subprocess.kill(9)
-      } catch {
-        /* already dead */
-      }
-    }, 5000)
-
-    try {
-      await managed.process.subprocess.exited
-    } catch {
-      /* ignore */
-    } finally {
-      clearTimeout(killTimeout)
-      managed.finishedAt = new Date()
-      logger.debug(
-        { issueId: managed.issueId, executionId, pid: this.getPidFromManaged(managed) },
-        'issue_process_cancel_finished',
-      )
-    }
+    await this.pm.terminate(executionId, () => managed.process.cancel())
+    managed.finishedAt = entry.finishedAt ?? new Date()
+    logger.debug(
+      { issueId: managed.issueId, executionId, pid: this.getPidFromManaged(managed) },
+      'issue_process_cancel_finished',
+    )
   }
 
   private ensureNoActiveProcess(issueId: string): void {
-    const active = this.getActiveProcessForIssue(issueId)
-    if (active) {
+    if (this.pm.hasActiveInGroup(issueId)) {
+      const active = this.getActiveProcessForIssue(issueId)
       throw new Error(
-        `Issue ${issueId} already has an active process (${active.executionId}). Cancel it first or wait for completion.`,
+        `Issue ${issueId} already has an active process (${active?.executionId}). Cancel it first or wait for completion.`,
       )
     }
   }
@@ -727,57 +710,26 @@ export class IssueEngine {
    *  Used as a safety guard before spawning a new follow-up process to prevent
    *  duplicate CLI processes for the same session. */
   private async killExistingSubprocessForIssue(issueId: string): Promise<void> {
-    for (const [executionId, managed] of this.processes) {
-      if (managed.issueId !== issueId || managed.finishedAt) continue
-      try {
-        managed.process.subprocess.kill()
-        logger.debug(
-          { issueId, executionId, pid: this.getPidFromManaged(managed) },
-          'issue_killed_existing_subprocess_before_followup_spawn',
-        )
-        // Wait briefly for clean exit, then force kill
-        const killTimeout = setTimeout(() => {
-          try {
-            managed.process.subprocess.kill(9)
-          } catch {
-            /* already dead */
-          }
-        }, 3000)
-        try {
-          await managed.process.subprocess.exited
-        } catch {
-          /* ignore */
-        } finally {
-          clearTimeout(killTimeout)
-        }
-      } catch {
-        /* subprocess already dead — ignore */
-      }
-      managed.finishedAt = new Date()
-      this.scheduleAutoCleanup(executionId)
-    }
+    await this.pm.terminateGroup(issueId, (entry) => {
+      logger.debug(
+        { issueId, executionId: entry.id, pid: this.getPidFromManaged(entry.meta) },
+        'issue_killed_existing_subprocess_before_followup_spawn',
+      )
+      entry.meta.finishedAt = new Date()
+    })
   }
 
-  private cleanup(executionId: string): void {
-    const managed = this.processes.get(executionId)
-    const timer = this.cleanupTimers.get(executionId)
-    if (timer) {
-      clearTimeout(timer)
-      this.cleanupTimers.delete(executionId)
-    }
-    if (managed && this.issueActiveExecution.get(managed.issueId) === executionId) {
-      this.issueActiveExecution.delete(managed.issueId)
-    }
-    this.processes.delete(executionId)
+  private cleanupDomainData(executionId: string): void {
     this.entryCounters.delete(executionId)
     this.turnIndexes.delete(executionId)
   }
 
-  private scheduleAutoCleanup(executionId: string): void {
-    const existing = this.cleanupTimers.get(executionId)
-    if (existing) clearTimeout(existing)
-    const timer = setTimeout(() => this.cleanup(executionId), AUTO_CLEANUP_DELAY_MS)
-    this.cleanupTimers.set(executionId, timer)
+  /** Sync ProcessManager state with the domain state set by IssueEngine.
+   *  PM's transitionState is idempotent, so double-sets are safe. */
+  private syncPmState(executionId: string, state: ProcessStatus): void {
+    if (state === 'completed') this.pm.markCompleted(executionId)
+    else if (state === 'failed') this.pm.markFailed(executionId)
+    // 'cancelled' is handled by pm.terminate() in cancel()
   }
 
   // ---- Private: stream entry handlers ----
@@ -801,7 +753,7 @@ export class IssueEngine {
   }
 
   private handleStreamEntry(issueId: string, executionId: string, entry: NormalizedLogEntry): void {
-    const managed = this.processes.get(executionId)
+    const managed = this.pm.get(executionId)?.meta
     if (!managed) return
 
     // Intercept auto-title pattern from AI response in meta turns
@@ -856,7 +808,7 @@ export class IssueEngine {
   }
 
   private handleStreamError(issueId: string, executionId: string, error: unknown): void {
-    const managed = this.processes.get(executionId)
+    const managed = this.pm.get(executionId)?.meta
     if (!managed) return
     const turnIdx = this.turnIndexes.get(executionId) ?? 0
     const errorEntry: NormalizedLogEntry = {
@@ -899,7 +851,7 @@ export class IssueEngine {
     const persisted = this.persistEntry(issueId, executionId, entry)
     if (persisted) {
       // Push persisted (with messageId) to in-memory logs for dedup
-      const managed = this.processes.get(executionId)
+      const managed = this.pm.get(executionId)?.meta
       if (managed) {
         managed.logs.push(persisted)
       }
@@ -965,7 +917,7 @@ export class IssueEngine {
   }
 
   private handleTurnCompleted(issueId: string, executionId: string): void {
-    const managed = this.processes.get(executionId)
+    const managed = this.pm.get(executionId)?.meta
     if (!managed || managed.state !== 'running') return
     managed.turnInFlight = false
     managed.queueCancelRequested = false
@@ -1054,11 +1006,11 @@ export class IssueEngine {
 
   // ---- Private: completion monitoring ----
 
-  /** Common settle flow: persist status, auto-move, schedule cleanup, emit event. */
+  /** Common settle flow: persist status, auto-move, clean domain data, emit event. */
   private async settleIssue(issueId: string, executionId: string, status: string): Promise<void> {
     await updateIssueSession(issueId, { sessionStatus: status })
     await autoMoveToReview(issueId)
-    this.scheduleAutoCleanup(executionId)
+    this.cleanupDomainData(executionId)
     this.emitIssueSettled(issueId, executionId, status)
   }
 
@@ -1068,7 +1020,7 @@ export class IssueEngine {
     engineType: EngineType,
     isRetry: boolean,
   ): void {
-    const managed = this.processes.get(executionId)
+    const managed = this.pm.get(executionId)?.meta
     if (!managed) return
 
     void (async () => {
@@ -1076,9 +1028,6 @@ export class IssueEngine {
         const exitCode = await managed.process.subprocess.exited
         managed.exitCode = exitCode
         managed.finishedAt = new Date()
-        if (this.issueActiveExecution.get(issueId) === executionId) {
-          this.issueActiveExecution.delete(issueId)
-        }
         logger.info(
           {
             issueId,
@@ -1096,9 +1045,11 @@ export class IssueEngine {
         // We use the turnSettled flag instead of checking managed.state because
         // the state is now kept as 'running' while the subprocess is alive.
         if (managed.turnSettled) {
-          managed.state = (managed.logicalFailure ? 'failed' : 'completed') as ProcessStatus
+          const finalState = (managed.logicalFailure ? 'failed' : 'completed') as ProcessStatus
+          managed.state = finalState
           managed.finishedAt = new Date()
-          this.scheduleAutoCleanup(executionId)
+          this.syncPmState(executionId, finalState)
+          this.cleanupDomainData(executionId)
           return
         }
 
@@ -1107,7 +1058,7 @@ export class IssueEngine {
         if (managed.pendingInputs.length > 0) {
           const queued = [...managed.pendingInputs]
           managed.pendingInputs = []
-          this.scheduleAutoCleanup(executionId)
+          this.cleanupDomainData(executionId)
           try {
             const first = queued.shift()
             if (!first) return
@@ -1119,7 +1070,7 @@ export class IssueEngine {
               undefined,
               first.metadata,
             )
-            const nextManaged = this.processes.get(result.executionId)
+            const nextManaged = this.pm.get(result.executionId)?.meta
             if (nextManaged && queued.length > 0) {
               nextManaged.pendingInputs.push(...queued)
               logger.debug(
@@ -1139,6 +1090,7 @@ export class IssueEngine {
         }
 
         if (managed.cancelledByUser || managed.state === 'cancelled') {
+          this.syncPmState(executionId, 'cancelled')
           await this.settleIssue(issueId, executionId, 'cancelled')
           return
         }
@@ -1146,10 +1098,12 @@ export class IssueEngine {
         const logicalFailure = managed.logicalFailure
         if (exitCode === 0 && !logicalFailure) {
           managed.state = 'completed'
+          this.syncPmState(executionId, 'completed')
           this.emitStateChange(issueId, executionId, 'completed')
           await this.settleIssue(issueId, executionId, 'completed')
         } else {
           managed.state = 'failed'
+          this.syncPmState(executionId, 'failed')
           this.emitStateChange(issueId, executionId, 'failed')
           logger.warn(
             {
@@ -1169,7 +1123,7 @@ export class IssueEngine {
               { issueId, executionId, retryCount: managed.retryCount },
               'auto_retry_issue',
             )
-            this.scheduleAutoCleanup(executionId)
+            this.cleanupDomainData(executionId)
 
             try {
               await this.spawnRetry(issueId, engineType)
@@ -1184,6 +1138,7 @@ export class IssueEngine {
       } catch {
         managed.state = 'failed'
         managed.finishedAt = new Date()
+        this.syncPmState(executionId, 'failed')
         this.emitStateChange(issueId, executionId, 'failed')
         await this.settleIssue(issueId, executionId, 'failed')
       }
@@ -1277,7 +1232,6 @@ export class IssueEngine {
     if (!issue) throw new Error(`Issue not found: ${issueId}`)
 
     this.ensureNoActiveProcess(issueId)
-    this.ensureConcurrencyLimit()
 
     const executor = engineRegistry.get(engineType)
     if (!executor) throw new Error(`No executor for engine type: ${engineType}`)
@@ -1329,8 +1283,6 @@ export class IssueEngine {
     if (!issue.sessionFields.externalSessionId)
       throw new Error('No external session ID for follow-up')
     if (!issue.sessionFields.engineType) throw new Error('No engine type set on issue')
-
-    this.ensureConcurrencyLimit()
 
     // Safety guard: kill any existing subprocess for this issue to prevent
     // duplicate CLI processes talking to the same Claude session.
@@ -1391,7 +1343,7 @@ export class IssueEngine {
       : { parse: (line: string) => executor.normalizeLog(line) }
 
     const turnIndex = getNextTurnIndex(issueId)
-    const managed = this.register(
+    this.register(
       executionId,
       issueId,
       spawned,
@@ -1417,35 +1369,21 @@ export class IssueEngine {
     return { executionId, messageId }
   }
 
-  // ---- Private: GC sweep ----
+  // ---- Private: domain GC sweep ----
 
   private gcSweep(): void {
     let cleaned = 0
-    for (const [executionId, managed] of this.processes) {
-      // Skip processes that are still actively running
-      if (this.isProcessActive(managed)) {
-        continue
-      }
-      // Stale: finished but never cleaned up (crashed path or missed settle)
-      this.cleanup(executionId)
-      cleaned++
-    }
-    // Clean orphaned issueActiveExecution entries pointing to non-existent processes
-    for (const [issueId, executionId] of this.issueActiveExecution) {
-      if (!this.processes.has(executionId)) {
-        this.issueActiveExecution.delete(issueId)
+    // Clean orphaned entryCounters/turnIndexes for entries no longer in PM
+    for (const executionId of this.entryCounters.keys()) {
+      if (!this.pm.has(executionId)) {
+        this.cleanupDomainData(executionId)
         cleaned++
       }
     }
-    // Clean orphaned issueOpLocks (resolved promises that were never removed)
-    for (const [issueId] of this.issueOpLocks) {
-      if (!this.issueActiveExecution.has(issueId)) {
-        this.issueOpLocks.delete(issueId)
-        cleaned++
-      }
-    }
+    // Note: issueOpLocks are NOT GC'd here — withIssueLock() self-cleans in its
+    // finally block. Deleting them externally would break the per-issue mutex.
     // Clean orphaned userMessageIds entries for issues no longer tracked
-    const activeIssueIds = new Set(Array.from(this.processes.values()).map((p) => p.issueId))
+    const activeIssueIds = new Set(this.pm.getActive().map((e) => e.meta.issueId))
     for (const key of this.userMessageIds.keys()) {
       const issueId = key.split(':')[0] ?? key
       if (!activeIssueIds.has(issueId)) {
@@ -1455,33 +1393,8 @@ export class IssueEngine {
     }
     if (cleaned > 0) {
       logger.debug(
-        {
-          cleaned,
-          remainingProcesses: this.processes.size,
-          remainingActiveExecs: this.issueActiveExecution.size,
-        },
+        { cleaned, pmSize: this.pm.size(), pmActive: this.pm.activeCount() },
         'gc_sweep_completed',
-      )
-    }
-  }
-
-  // ---- Private: concurrency guard ----
-
-  private getRunningCount(): number {
-    let count = 0
-    for (const managed of this.processes.values()) {
-      if (managed.state === 'running' || managed.state === 'spawning') {
-        count++
-      }
-    }
-    return count
-  }
-
-  private ensureConcurrencyLimit(): void {
-    const running = this.getRunningCount()
-    if (running >= MAX_CONCURRENT_EXECUTIONS) {
-      throw new Error(
-        `Global concurrency limit reached (${running}/${MAX_CONCURRENT_EXECUTIONS}). Cancel an existing execution or wait for one to complete.`,
       )
     }
   }

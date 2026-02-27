@@ -1,7 +1,7 @@
-import type { Subprocess } from 'bun'
 import { zValidator } from '@hono/zod-validator'
 import { Hono } from 'hono'
 import { z } from 'zod'
+import { ProcessManager } from '../engines/process-manager'
 import { logger } from '../logger'
 import { upgradeWebSocket } from '../ws'
 
@@ -45,46 +45,67 @@ interface WsLike {
   close?: (code?: number, reason?: string) => void
 }
 
-interface TerminalSession {
-  id: string
-  proc: Subprocess
+interface TerminalMeta {
   wsRaw: WsLike | null
-  createdAt: number
   graceTimer: ReturnType<typeof setTimeout> | null
 }
-
-const sessions = new Map<string, TerminalSession>()
 
 const MAX_SESSIONS = 10
 const GRACE_PERIOD_MS = 60_000 // keep PTY alive 60s after WS disconnect
 const MAX_COLS = 500
 const MAX_ROWS = 200
 
-function killSession(session: TerminalSession): void {
-  if (session.graceTimer) clearTimeout(session.graceTimer)
+const terminalPM = new ProcessManager<TerminalMeta>('terminal', {
+  maxConcurrent: MAX_SESSIONS,
+  autoCleanupDelayMs: 0,
+  gcIntervalMs: 5 * 60 * 1000,
+  killTimeoutMs: 3000,
+  logger,
+})
+
+function killSession(id: string): void {
+  const entry = terminalPM.get(id)
+  if (!entry) return
+  if (entry.meta.graceTimer) clearTimeout(entry.meta.graceTimer)
   try {
-    session.proc.terminal?.close()
+    entry.subprocess.terminal?.close()
   } catch {
     /* already closed */
   }
-  session.proc.kill()
-  sessions.delete(session.id)
+  terminalPM.forceKill(id)
+  terminalPM.remove(id)
 }
 
+// Handle PTY exit: close attached WS and remove entry
+terminalPM.onExit((entry) => {
+  logger.info({ id: entry.id, exitCode: entry.exitCode }, 'terminal_pty_exited')
+  if (entry.meta.wsRaw) {
+    try {
+      entry.meta.wsRaw.close?.(1000, 'PTY exited')
+    } catch {
+      /* already closed */
+    }
+  }
+  terminalPM.remove(entry.id)
+})
+
 // Periodic cleanup: kill sessions older than 24h
-setInterval(
+const expiryTimer = setInterval(
   () => {
     const now = Date.now()
     const MAX_AGE = 24 * 60 * 60 * 1000
-    for (const [, session] of sessions) {
-      if (now - session.createdAt > MAX_AGE) {
-        logger.info({ id: session.id }, 'terminal_session_expired')
-        killSession(session)
+    for (const entry of terminalPM.getActive()) {
+      if (now - entry.startedAt.getTime() > MAX_AGE) {
+        logger.info({ id: entry.id }, 'terminal_session_expired')
+        killSession(entry.id)
       }
     }
   },
   5 * 60 * 1000,
 )
+if (typeof expiryTimer === 'object' && 'unref' in expiryTimer) {
+  ;(expiryTimer as NodeJS.Timeout).unref()
+}
 
 // --- Routes ---
 
@@ -92,19 +113,12 @@ const app = new Hono()
 
 // POST /terminal — Create a new terminal session (spawn PTY)
 app.post('/terminal', (c) => {
-  if (sessions.size >= MAX_SESSIONS) {
-    return c.json({ success: false, error: 'Session limit reached' }, 429)
-  }
-
   const id = crypto.randomUUID()
 
-  const session: TerminalSession = {
-    id,
-    proc: null!,
-    wsRaw: null,
-    createdAt: Date.now(),
-    graceTimer: null,
-  }
+  // We need a reference the PTY data callback can close over
+  // to forward output to the attached WS. The meta object is
+  // shared by reference with the PM entry.
+  const meta: TerminalMeta = { wsRaw: null, graceTimer: null }
 
   const proc = Bun.spawn([defaultShell, '-l'], {
     terminal: {
@@ -112,9 +126,9 @@ app.post('/terminal', (c) => {
       rows: 24,
       data(_terminal, data) {
         // Forward PTY output to attached WS (if any)
-        if (session.wsRaw) {
+        if (meta.wsRaw) {
           try {
-            session.wsRaw.send(data)
+            meta.wsRaw.send(data)
           } catch {
             /* WS gone */
           }
@@ -132,22 +146,15 @@ app.post('/terminal', (c) => {
     },
   })
 
-  session.proc = proc
-  sessions.set(id, session)
+  try {
+    terminalPM.register(id, proc, meta, { group: 'terminal', startAsRunning: true })
+  } catch {
+    // Concurrency limit reached
+    proc.kill()
+    return c.json({ success: false, error: 'Session limit reached' }, 429)
+  }
 
   logger.info({ id, pid: proc.pid, shell: defaultShell }, 'terminal_session_created')
-
-  void proc.exited.then((exitCode) => {
-    logger.info({ id, exitCode }, 'terminal_pty_exited')
-    if (session.wsRaw) {
-      try {
-        session.wsRaw.close?.(1000, 'PTY exited')
-      } catch {
-        /* already closed */
-      }
-    }
-    sessions.delete(id)
-  })
 
   return c.json({ success: true, data: { id } })
 })
@@ -158,7 +165,7 @@ app.get(
   // Reject before upgrade if session doesn't exist
   (c, next) => {
     const id = c.req.param('id')
-    if (!sessions.has(id)) {
+    if (!terminalPM.has(id)) {
       return c.json({ success: false, error: 'Session not found' }, 404)
     }
     return next()
@@ -168,27 +175,27 @@ app.get(
 
     return {
       onOpen(_evt, ws) {
-        const session = sessions.get(id)
-        if (!session) {
+        const entry = terminalPM.get(id)
+        if (!entry) {
           ws.close(1008, 'Session not found')
           return
         }
 
         // Clear grace timer — WS reconnected
-        if (session.graceTimer) {
-          clearTimeout(session.graceTimer)
-          session.graceTimer = null
+        if (entry.meta.graceTimer) {
+          clearTimeout(entry.meta.graceTimer)
+          entry.meta.graceTimer = null
         }
 
         // Detach previous WS (if any)
-        session.wsRaw = ws.raw
+        entry.meta.wsRaw = ws.raw
 
-        logger.info({ id, pid: session.proc.pid }, 'terminal_ws_attached')
+        logger.info({ id, pid: entry.subprocess.pid }, 'terminal_ws_attached')
       },
 
       onMessage(evt) {
-        const session = sessions.get(id)
-        if (!session?.proc?.terminal) return
+        const entry = terminalPM.get(id)
+        if (!entry?.subprocess?.terminal) return
 
         const raw =
           evt.data instanceof ArrayBuffer
@@ -204,40 +211,40 @@ app.get(
         if (type === 0) {
           // Input: [0x00][...data]
           const input = new TextDecoder().decode(raw.slice(1))
-          session.proc.terminal.write(input)
+          entry.subprocess.terminal.write(input)
         } else if (type === 1 && raw.length >= 5) {
           // Resize: [0x01][cols:u16BE][rows:u16BE]
           const view = new DataView(raw.buffer, raw.byteOffset, raw.byteLength)
           const cols = view.getUint16(1, false)
           const rows = view.getUint16(3, false)
           if (cols > 0 && cols <= MAX_COLS && rows > 0 && rows <= MAX_ROWS) {
-            session.proc.terminal.resize(cols, rows)
+            entry.subprocess.terminal.resize(cols, rows)
           }
         }
       },
 
       onClose() {
-        const session = sessions.get(id)
-        if (!session) return
+        const entry = terminalPM.get(id)
+        if (!entry) return
 
-        session.wsRaw = null
+        entry.meta.wsRaw = null
         logger.info({ id }, 'terminal_ws_detached')
 
         // Start grace period — keep PTY alive for reconnection
-        session.graceTimer = setTimeout(() => {
-          session.graceTimer = null
-          if (!session.wsRaw) {
+        entry.meta.graceTimer = setTimeout(() => {
+          entry.meta.graceTimer = null
+          if (!entry.meta.wsRaw) {
             logger.info({ id }, 'terminal_grace_expired')
-            killSession(session)
+            killSession(id)
           }
         }, GRACE_PERIOD_MS)
       },
 
       onError(evt) {
         logger.error({ id, error: String(evt) }, 'terminal_ws_error')
-        const session = sessions.get(id)
-        if (!session) return
-        session.wsRaw = null
+        const entry = terminalPM.get(id)
+        if (!entry) return
+        entry.meta.wsRaw = null
       },
     }
   }),
@@ -255,14 +262,14 @@ app.post(
   ),
   (c) => {
     const id = c.req.param('id')
-    const session = sessions.get(id)
-    if (!session) {
+    const entry = terminalPM.get(id)
+    if (!entry) {
       return c.json({ success: false, error: 'Session not found' }, 404)
     }
 
     const { cols, rows } = c.req.valid('json')
     try {
-      session.proc.terminal?.resize(cols, rows)
+      entry.subprocess.terminal?.resize(cols, rows)
     } catch {
       /* terminal closed */
     }
@@ -273,13 +280,13 @@ app.post(
 // DELETE /terminal/:id — Kill terminal session
 app.delete('/terminal/:id', (c) => {
   const id = c.req.param('id')
-  const session = sessions.get(id)
-  if (!session) {
+  const entry = terminalPM.get(id)
+  if (!entry) {
     return c.json({ success: false, error: 'Session not found' }, 404)
   }
 
-  logger.info({ id, pid: session.proc.pid }, 'terminal_session_killed')
-  killSession(session)
+  logger.info({ id, pid: entry.subprocess.pid }, 'terminal_session_killed')
+  killSession(id)
 
   return c.json({ success: true })
 })

@@ -4,7 +4,7 @@ import { ensureDefaultFilterRules } from '../db/helpers'
 import { issues as issuesTable } from '../db/schema'
 import { emitIssueUpdated } from '../events/issue-events'
 import { logger } from '../logger'
-import { issueEngine } from './issue-engine'
+import { issueEngine } from './issue'
 
 // ---------- Constants ----------
 

@@ -5,7 +5,7 @@ import { Hono } from 'hono'
 import { db } from '../../db'
 import { findProject } from '../../db/helpers'
 import { issuesLogsToolsCall as issuesLogsToolsTable } from '../../db/schema'
-import { issueEngine } from '../../engines/issue-engine'
+import { issueEngine } from '../../engines/issue'
 import { getProjectOwnedIssue, serializeIssue } from './_shared'
 
 const logs = new Hono()

@@ -6,7 +6,7 @@ import { db } from '../../db'
 import { findProject, getDefaultEngine, getEngineDefaultModel } from '../../db/helpers'
 import { issues as issuesTable } from '../../db/schema'
 import { engineRegistry } from '../../engines/executors'
-import { issueEngine, setIssueDevMode } from '../../engines/issue-engine'
+import { issueEngine, setIssueDevMode } from '../../engines/issue'
 import { emitIssueUpdated } from '../../events/issue-events'
 import { logger } from '../../logger'
 import {

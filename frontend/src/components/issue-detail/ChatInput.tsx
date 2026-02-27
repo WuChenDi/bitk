@@ -100,10 +100,7 @@ export function ChatInput({
       : busyAction
     : undefined
 
-  // Slash command autocomplete + command picker
-  const [slashOpen, setSlashOpen] = useState(false)
-  const [slashIndex, setSlashIndex] = useState(0)
-  const slashDropdownRef = useRef<HTMLDivElement>(null)
+  // Command picker
   const [cmdPickerOpen, setCmdPickerOpen] = useState(false)
   const [cmdPickerSearch, setCmdPickerSearch] = useState('')
   const cmdPickerRef = useRef<HTMLDivElement>(null)
@@ -115,16 +112,6 @@ export function ChatInput({
     () => slashCommands.map((cmd) => (cmd.startsWith('/') ? cmd : `/${cmd}`)),
     [slashCommands],
   )
-
-  const filteredSlashCommands = useMemo(() => {
-    if (!slashOpen || normalizedCommands.length === 0) return []
-    const trimmed = input.trim()
-    if (!trimmed.startsWith('/')) return []
-    const query = trimmed.toLowerCase()
-    return normalizedCommands.filter((cmd) =>
-      cmd.toLowerCase().startsWith(query),
-    )
-  }, [slashOpen, normalizedCommands, input])
 
   const filteredPickerCommands = useMemo(() => {
     if (!cmdPickerOpen) return []
@@ -252,9 +239,6 @@ export function ChatInput({
 
   const selectSlashCommand = useCallback((cmd: string) => {
     setInput(cmd)
-    setSlashOpen(false)
-    setSlashIndex(0)
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
       textareaRef.current.focus()
@@ -262,34 +246,6 @@ export function ChatInput({
   }, [])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Slash command navigation
-    if (slashOpen && filteredSlashCommands.length > 0) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault()
-        setSlashIndex((i) => (i + 1) % filteredSlashCommands.length)
-        return
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault()
-        setSlashIndex(
-          (i) =>
-            (i - 1 + filteredSlashCommands.length) %
-            filteredSlashCommands.length,
-        )
-        return
-      }
-      if (e.key === 'Tab' || e.key === 'Enter') {
-        e.preventDefault()
-        selectSlashCommand(filteredSlashCommands[slashIndex])
-        return
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        setSlashOpen(false)
-        return
-      }
-    }
-
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault()
       handleSend()
@@ -303,21 +259,8 @@ export function ChatInput({
       const el = e.target
       el.style.height = 'auto'
       el.style.height = `${Math.min(el.scrollHeight, 120)}px`
-
-      // Open slash autocomplete when typing "/" at the start
-      const trimmed = val.trim()
-      if (
-        trimmed.startsWith('/') &&
-        normalizedCommands.length > 0 &&
-        !trimmed.includes(' ')
-      ) {
-        setSlashOpen(true)
-        setSlashIndex(0)
-      } else {
-        setSlashOpen(false)
-      }
     },
-    [normalizedCommands],
+    [],
   )
 
   const handlePaste = useCallback(
@@ -369,7 +312,7 @@ export function ChatInput({
   )
 
   return (
-    <div className="shrink-0 w-full min-w-0 px-4 pb-4">
+    <div className="shrink-0 w-full min-w-0 px-4 pb-4 relative z-30">
       <div
         className={`rounded-xl border bg-card/80 backdrop-blur-sm shadow-sm transition-all duration-200 focus-within:border-border focus-within:shadow-md ${
           isDragOver
@@ -428,29 +371,6 @@ export function ChatInput({
         {sendError ? (
           <div className="mx-3 mt-2 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive">
             {sendError}
-          </div>
-        ) : null}
-
-        {/* Slash command autocomplete dropdown */}
-        {slashOpen && filteredSlashCommands.length > 0 ? (
-          <div
-            ref={slashDropdownRef}
-            className="mx-3 mt-1.5 rounded-lg border border-border/60 bg-popover/95 backdrop-blur-sm py-1 shadow-xl text-xs text-popover-foreground max-h-[200px] overflow-y-auto"
-          >
-            {filteredSlashCommands.map((cmd, idx) => (
-              <button
-                key={cmd}
-                type="button"
-                onClick={() => selectSlashCommand(cmd)}
-                className={`flex items-center gap-2 w-full px-3 py-1.5 text-left transition-colors ${
-                  idx === slashIndex
-                    ? 'bg-primary/10 text-primary font-medium'
-                    : 'hover:bg-accent/50'
-                }`}
-              >
-                <code className="font-mono text-xs">{cmd}</code>
-              </button>
-            ))}
           </div>
         ) : null}
 

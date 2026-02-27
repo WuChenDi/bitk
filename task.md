@@ -19,7 +19,7 @@
 
 - Format: `PREFIX-NNN` — uppercase category prefix + sequential number.
 - IDs are stable once assigned; never reuse or renumber.
-- Next IDs: UI-014, FE-129, BUG-082, SEC-026, ARCH-017, AGENT-012, SSE-004, PERF-005, TEST-009, FEAT-011, OBS-005, AUDIT-006, CLEAN-008, ENG-003, API-006, UX-004, CODEX-007, DB-006
+- Next IDs: UI-014, FE-129, BUG-082, SEC-026, ARCH-018, AGENT-012, SSE-004, PERF-005, TEST-009, FEAT-011, OBS-005, AUDIT-006, CLEAN-008, ENG-003, API-006, UX-004, CODEX-007, DB-006
 
 ### Status Markers
 
@@ -473,6 +473,11 @@
   - description: Moved language selector and theme toggle from the sidebar into AppSettingsDialog. Removed standalone LanguageSelector and ThemeToggle components from AppSidebar and MobileSidebar. Mobile sidebar now has a Settings button that opens the same dialog.
   - activeForm: Moving language/theme to settings dialog
   - createdAt: 2026-02-27 12:00
+
+- [x] **ARCH-017 Extract unified ProcessManager<TMeta> class** `P1`
+  - description: Extracted generic process lifecycle management into `app/engines/process-manager.ts`. Refactored IssueEngine to delegate process registration, group indexing, concurrency limits, and auto-cleanup to PM. Refactored terminal.ts to use PM for session management. Removed 3 redundant Maps and 4 methods from IssueEngine.
+  - activeForm: Extracting ProcessManager class
+  - createdAt: 2026-02-27 18:00
 
 - [-] **BUG-080 Fix duplicate Claude process spawning for same session** `P0`
   - description: `handleTurnCompleted()` sets `managed.state = 'completed'` while the subprocess is still alive (conversational engines keep process running between turns). `getActiveProcessForIssue()` only finds `running`/`spawning` states, so follow-up calls spawn a new `--resume` process, creating duplicate processes for the same session. Fix: keep `managed.state = 'running'` after turn completes (subprocess IS alive), add `turnSettled` flag for DB/event handling, and add safety guard in `spawnFollowUpProcess()` to kill old processes.

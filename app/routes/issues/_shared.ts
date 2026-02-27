@@ -8,7 +8,7 @@ import { db } from '../../db'
 import { getAppSetting } from '../../db/helpers'
 import { getPendingMessages, markPendingMessagesDispatched } from '../../db/pending-messages'
 import { issues as issuesTable } from '../../db/schema'
-import { issueEngine } from '../../engines/issue-engine'
+import { issueEngine } from '../../engines/issue'
 import { emitIssueUpdated } from '../../events/issue-events'
 import { logger } from '../../logger'
 

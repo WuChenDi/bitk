@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import {
   useCancelIssue,
+  useGlobalSlashCommands,
   useSlashCommands,
   useUpdateIssue,
 } from '@/hooks/use-kanban'
@@ -129,12 +130,10 @@ export function ChatBody({
   const cancelIssue = useCancelIssue(projectId)
 
   const hasSession = !!issue.sessionStatus
-  const { data: slashCommandsData } = useSlashCommands(
-    projectId,
-    issueId,
-    hasSession,
-  )
-  const slashCommands = slashCommandsData?.commands ?? []
+  const { data: globalCmds } = useGlobalSlashCommands()
+  const { data: liveCmds } = useSlashCommands(projectId, issueId, hasSession)
+  const slashCommands =
+    (liveCmds?.commands.length ? liveCmds.commands : globalCmds?.commands) ?? []
 
   const { logs, isThinking, workingStep, isTodo, isDone, appendServerMessage } =
     useSessionState(projectId, issueId, issue)

@@ -4,7 +4,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '../db'
 import { findProject } from '../db/helpers'
 import { issuesLogsToolsCall as issuesLogsToolsTable, issues as issuesTable } from '../db/schema'
-import { issueEngine } from '../engines/issue-engine'
+import { issueEngine } from '../engines/issue'
 import { logger } from '../logger'
 
 export interface ChangesSummary {

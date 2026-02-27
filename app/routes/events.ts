@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { streamSSE } from 'hono/streaming'
-import { issueEngine } from '../engines/issue-engine'
+import { issueEngine } from '../engines/issue'
 import { onChangesSummary } from '../events/changes-summary'
 import { onIssueUpdated } from '../events/issue-events'
 import { logger } from '../logger'

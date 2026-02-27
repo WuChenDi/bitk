@@ -107,4 +107,22 @@ settings.patch(
   },
 )
 
+// --- Slash Commands (cached from engine init) ---
+
+const SLASH_COMMANDS_KEY = 'engine:slashCommands'
+
+// GET /api/settings/slash-commands
+settings.get('/slash-commands', async (c) => {
+  const raw = await getAppSetting(SLASH_COMMANDS_KEY)
+  let commands: string[] = []
+  if (raw) {
+    try {
+      commands = JSON.parse(raw) as string[]
+    } catch {
+      commands = []
+    }
+  }
+  return c.json({ success: true, data: { commands } })
+})
+
 export default settings
