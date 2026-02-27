@@ -25,6 +25,7 @@ import { autoMoveToReview, getIssueWithSession, updateIssueSession } from './eng
 import { engineRegistry } from './executors'
 import { normalizeStream } from './logs'
 import { BUILT_IN_PROFILES } from './types'
+import { loadFilterRules } from './write-filter'
 
 // ---------- Internal types ----------
 
@@ -353,11 +354,16 @@ export class IssueEngine {
         'issue_execute_spawned',
       )
 
+      const filterRules = await loadFilterRules()
+      const normalizer = executor.createNormalizer
+        ? executor.createNormalizer(filterRules)
+        : { parse: (line: string) => executor.normalizeLog(line) }
+
       this.register(
         executionId,
         issueId,
         spawned,
-        (line) => executor.normalizeLog(line),
+        (line) => normalizer.parse(line),
         0,
         worktreePath,
       )
@@ -595,12 +601,17 @@ export class IssueEngine {
         })
       }
 
+      const filterRules = await loadFilterRules()
+      const normalizer = executor.createNormalizer
+        ? executor.createNormalizer(filterRules)
+        : { parse: (line: string) => executor.normalizeLog(line) }
+
       const turnIndex = this.getNextTurnIndex(issueId)
       this.register(
         executionId,
         issueId,
         spawned,
-        (line) => executor.normalizeLog(line),
+        (line) => normalizer.parse(line),
         turnIndex,
         worktreePath,
       )
@@ -1820,8 +1831,13 @@ export class IssueEngine {
       })
     }
 
+    const filterRules = await loadFilterRules()
+    const normalizer = executor.createNormalizer
+      ? executor.createNormalizer(filterRules)
+      : { parse: (line: string) => executor.normalizeLog(line) }
+
     const turnIndex = this.getNextTurnIndex(issueId)
-    this.register(executionId, issueId, spawned, (line) => executor.normalizeLog(line), turnIndex)
+    this.register(executionId, issueId, spawned, (line) => normalizer.parse(line), turnIndex)
     this.monitorCompletion(executionId, issueId, engineType, true)
     logger.debug({ issueId, executionId, engineType, turnIndex }, 'issue_retry_spawned')
   }
@@ -1941,12 +1957,17 @@ export class IssueEngine {
       })
     }
 
+    const filterRules = await loadFilterRules()
+    const normalizer = executor.createNormalizer
+      ? executor.createNormalizer(filterRules)
+      : { parse: (line: string) => executor.normalizeLog(line) }
+
     const turnIndex = this.getNextTurnIndex(issueId)
     const managed = this.register(
       executionId,
       issueId,
       spawned,
-      (line) => executor.normalizeLog(line),
+      (line) => normalizer.parse(line),
       turnIndex,
       worktreePath,
     )

@@ -190,6 +190,10 @@ export interface EngineExecutor {
   getAvailability: () => Promise<EngineAvailability>
   getModels: () => Promise<EngineModel[]>
   normalizeLog: (rawLine: string) => NormalizedLogEntry | NormalizedLogEntry[] | null
+
+  createNormalizer?: (filterRules: import('./write-filter').WriteFilterRule[]) => {
+    parse: (rawLine: string) => NormalizedLogEntry | NormalizedLogEntry[] | null
+  }
 }
 
 // Engine registry (manages all executors)

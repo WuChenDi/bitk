@@ -169,3 +169,13 @@ export async function saveProbeResults(
     setAppSetting(PROBE_MODELS_KEY, JSON.stringify(models)),
   ])
 }
+
+// --- Write Filter default rules seeding ---
+
+export async function ensureDefaultFilterRules(): Promise<void> {
+  const { WRITE_FILTER_RULES_KEY, DEFAULT_FILTER_RULES } = await import('../engines/write-filter')
+  const existing = await getAppSetting(WRITE_FILTER_RULES_KEY)
+  if (!existing) {
+    await setAppSetting(WRITE_FILTER_RULES_KEY, JSON.stringify(DEFAULT_FILTER_RULES))
+  }
+}
