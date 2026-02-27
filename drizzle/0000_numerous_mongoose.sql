@@ -6,6 +6,24 @@ CREATE TABLE `app_settings` (
 	`is_deleted` integer DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE `attachments` (
+	`id` text PRIMARY KEY NOT NULL,
+	`issue_id` text NOT NULL,
+	`log_id` text,
+	`original_name` text NOT NULL,
+	`stored_name` text NOT NULL,
+	`mime_type` text NOT NULL,
+	`size` integer NOT NULL,
+	`storage_path` text NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	`is_deleted` integer DEFAULT 0 NOT NULL,
+	FOREIGN KEY (`issue_id`) REFERENCES `issues`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`log_id`) REFERENCES `issues_logs`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE INDEX `attachments_issue_id_idx` ON `attachments` (`issue_id`);--> statement-breakpoint
+CREATE INDEX `attachments_log_id_idx` ON `attachments` (`log_id`);--> statement-breakpoint
 CREATE TABLE `issues_logs` (
 	`id` text PRIMARY KEY NOT NULL,
 	`issue_id` text NOT NULL,
@@ -17,6 +35,7 @@ CREATE TABLE `issues_logs` (
 	`reply_to_message_id` text,
 	`timestamp` text,
 	`tool_call_ref_id` text,
+	`visible` integer DEFAULT 1 NOT NULL,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
 	`is_deleted` integer DEFAULT 0 NOT NULL,
@@ -40,6 +59,7 @@ CREATE TABLE `issues` (
 	`prompt` text,
 	`external_session_id` text,
 	`model` text,
+	`dev_mode` integer DEFAULT false NOT NULL,
 	`base_commit_hash` text,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL,
@@ -52,6 +72,7 @@ CREATE TABLE `issues` (
 CREATE INDEX `issues_project_id_idx` ON `issues` (`project_id`);--> statement-breakpoint
 CREATE INDEX `issues_status_id_idx` ON `issues` (`status_id`);--> statement-breakpoint
 CREATE INDEX `issues_parent_issue_id_idx` ON `issues` (`parent_issue_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `issues_project_id_issue_number_uniq` ON `issues` (`project_id`,`issue_number`);--> statement-breakpoint
 CREATE TABLE `issues_logs_tools_call` (
 	`id` text PRIMARY KEY NOT NULL,
 	`log_id` text NOT NULL,

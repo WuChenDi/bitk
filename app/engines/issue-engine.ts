@@ -9,7 +9,7 @@ import type {
 } from './types'
 import { mkdir, rm, stat } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { asc, eq, max } from 'drizzle-orm'
+import { and, asc, eq, inArray, max } from 'drizzle-orm'
 import { ulid } from 'ulid'
 import { db } from '../db'
 import { getPendingMessages, markPendingMessagesDispatched } from '../db/pending-messages'
@@ -48,7 +48,7 @@ interface ManagedProcess {
    *  from re-settling on exit, and is reset when a new turn starts. */
   turnSettled: boolean
   /** True when the current turn was initiated by a meta follow-up (e.g. auto-title).
-   *  All log entries in this turn will be tagged with `meta: true` and suppressed from the frontend. */
+   *  All log entries in this turn will be tagged with `type: 'system'` and set visible=0. */
   metaTurn: boolean
   worktreePath?: string
   pendingInputs: Array<{
@@ -56,6 +56,7 @@ interface ManagedProcess {
     model?: string
     permissionMode?: PermissionPolicy
     busyAction: 'queue' | 'cancel'
+    displayPrompt?: string
     metadata?: Record<string, unknown>
   }>
 }
@@ -74,24 +75,27 @@ const GC_INTERVAL_MS = 10 * 60 * 1000 // 10 minutes
 const MAX_CONCURRENT_EXECUTIONS = Number(process.env.MAX_CONCURRENT_EXECUTIONS) || 5
 
 // ---------- Helpers ----------
-function isFrontendSuppressedEntry(entry: NormalizedLogEntry, devMode: boolean): boolean {
-  // Always hidden regardless of mode
-  if (entry.metadata?.pending === false) return true
-  if (entry.metadata?.meta === true) return true
 
-  // Default mode: whitelist only user + assistant messages
-  if (!devMode) {
-    return entry.entryType !== 'user-message' && entry.entryType !== 'assistant-message'
-  }
-
-  // Dev mode: show everything except init/hook noise
-  if (entry.entryType !== 'system-message') return false
-  const subtype = entry.metadata?.subtype
-  if (subtype === 'init') return true
-  if (subtype === 'hook_response' && typeof entry.metadata?.hookName === 'string') {
-    return entry.metadata.hookName.startsWith('SessionStart:')
+/** Entries that are permanently hidden in ALL modes — maps to visible=0 in DB */
+function isAlwaysHidden(entry: NormalizedLogEntry): boolean {
+  if (entry.metadata?.type === 'system') return true
+  if (entry.entryType === 'system-message') {
+    const subtype = entry.metadata?.subtype
+    if (subtype === 'init') return true
+    if (subtype === 'hook_response' && typeof entry.metadata?.hookName === 'string') {
+      return entry.metadata.hookName.startsWith('SessionStart:')
+    }
   }
   return false
+}
+
+/** Check if entry is visible given current devMode (used for in-memory logs & SSE) */
+function isVisibleForMode(entry: NormalizedLogEntry, devMode: boolean): boolean {
+  if (isAlwaysHidden(entry)) return false
+  if (!devMode) {
+    return entry.entryType === 'user-message' || entry.entryType === 'assistant-message'
+  }
+  return true
 }
 
 const devModeCache = new Map<string, boolean>()
@@ -411,6 +415,7 @@ export class IssueEngine {
             model: effectiveModel,
             permissionMode,
             busyAction,
+            displayPrompt,
             metadata,
           })
           logger.debug(
@@ -632,10 +637,8 @@ export class IssueEngine {
 
   getLogs(issueId: string, devMode = false): NormalizedLogEntry[] {
     setIssueDevMode(issueId, devMode)
-    // Always use DB as source of truth so history across all turns remains complete.
-    const persisted = this.getLogsFromDb(issueId).filter(
-      (entry) => !isFrontendSuppressedEntry(entry, devMode),
-    )
+    // DB query already filters by visible=1 and entryType (when !devMode).
+    const persisted = this.getLogsFromDb(issueId, devMode)
 
     // While a process is active, merge any in-memory tail not yet persisted.
     const active = this.getActiveProcessForIssue(issueId)
@@ -653,7 +656,7 @@ export class IssueEngine {
 
     const merged = [...persisted]
     for (const entry of active.logs) {
-      if (isFrontendSuppressedEntry(entry, devMode)) continue
+      if (!isVisibleForMode(entry, devMode)) continue
       const key = entry.messageId
         ? `id:${entry.messageId}`
         : `${entry.turnIndex ?? 0}:${entry.timestamp ?? ''}:${entry.entryType}:${entry.content}`
@@ -982,6 +985,7 @@ export class IssueEngine {
           metadata: entry.metadata ? JSON.stringify(entry.metadata) : null,
           replyToMessageId,
           timestamp: entry.timestamp ?? null,
+          visible: isAlwaysHidden(entry) ? 0 : 1,
         })
         .run()
 
@@ -1069,11 +1073,15 @@ export class IssueEngine {
     }
   }
 
-  private getLogsFromDb(issueId: string): NormalizedLogEntry[] {
+  private getLogsFromDb(issueId: string, devMode = false): NormalizedLogEntry[] {
+    const conditions = [eq(logsTable.issueId, issueId), eq(logsTable.visible, 1)]
+    if (!devMode) {
+      conditions.push(inArray(logsTable.entryType, ['user-message', 'assistant-message']))
+    }
     const rows = db
       .select()
       .from(logsTable)
-      .where(eq(logsTable.issueId, issueId))
+      .where(and(...conditions))
       .orderBy(asc(logsTable.turnIndex), asc(logsTable.entryIndex))
       .limit(MAX_LOG_ENTRIES)
       .all()
@@ -1164,12 +1172,19 @@ export class IssueEngine {
     metadata?: Record<string, unknown>,
   ): string | null {
     const turnIdx = this.turnIndexes.get(executionId) ?? 0
+    // When displayPrompt is provided on a meta turn, the user wants this message visible.
+    // Strip type:'system' so isAlwaysHidden() won't hide it.
+    let entryMeta = metadata
+    if (displayPrompt && metadata?.type === 'system') {
+      const { type: _type, ...rest } = metadata
+      entryMeta = Object.keys(rest).length > 0 ? rest : undefined
+    }
     const entry: NormalizedLogEntry = {
       entryType: 'user-message',
       content: (displayPrompt ?? prompt).trim(),
       turnIndex: turnIdx,
       timestamp: new Date().toISOString(),
-      ...(metadata ? { metadata } : {}),
+      ...(entryMeta ? { metadata: entryMeta } : {}),
     }
 
     // Persist first, then emit (DB is source of truth)
@@ -1217,7 +1232,7 @@ export class IssueEngine {
     managed.logicalFailure = false
     managed.logicalFailureReason = undefined
     managed.cancelledByUser = false
-    managed.metaTurn = metadata?.meta === true
+    managed.metaTurn = metadata?.type === 'system'
     const messageId = this.persistUserMessage(
       issueId,
       managed.executionId,
@@ -1261,7 +1276,7 @@ export class IssueEngine {
 
         // Tag all entries in a meta turn so they are hidden from the frontend
         if (managed.metaTurn) {
-          entry.metadata = { ...entry.metadata, meta: true }
+          entry.metadata = { ...entry.metadata, type: 'system' }
         }
 
         // Intercept auto-title pattern from AI response in meta turns
@@ -1468,7 +1483,7 @@ export class IssueEngine {
     if (next.model) {
       await updateIssueSession(issueId, { model: next.model })
     }
-    this.sendInputToRunningProcess(issueId, managed, next.prompt, undefined, next.metadata)
+    this.sendInputToRunningProcess(issueId, managed, next.prompt, next.displayPrompt, next.metadata)
   }
 
   private async consumeStderr(
@@ -1908,7 +1923,7 @@ export class IssueEngine {
       turnIndex,
       worktreePath,
     )
-    if (metadata?.meta === true) {
+    if (metadata?.type === 'system') {
       managed.metaTurn = true
     }
     const messageId = this.persistUserMessage(issueId, executionId, prompt, displayPrompt, metadata)
@@ -2005,7 +2020,7 @@ export class IssueEngine {
 
   private emitLog(issueId: string, executionId: string, entry: NormalizedLogEntry): void {
     const devMode = getIssueDevMode(issueId)
-    if (isFrontendSuppressedEntry(entry, devMode)) return
+    if (!isVisibleForMode(entry, devMode)) return
     for (const cb of this.logCallbacks.values()) {
       try {
         cb(issueId, executionId, entry)

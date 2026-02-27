@@ -282,9 +282,10 @@ export function useAutoTitleIssue(projectId: string) {
         AUTO_TITLE_PROMPT,
         undefined,
         undefined,
-        undefined,
+        'queue',
         undefined,
         true,
+        '使用AI自动更新标题',
       ),
     onSuccess: (_data, issueId) => {
       queryClient.invalidateQueries({

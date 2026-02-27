@@ -1,10 +1,8 @@
-import { useState } from 'react'
 import {
   AlertCircle,
   CheckCircle2,
   Circle,
   Clock,
-  Code,
   FileEdit,
   FileText,
   Globe,
@@ -169,8 +167,8 @@ export function LogEntry({
 
   switch (entry.entryType) {
     case 'user-message': {
-      const isPending = entry.metadata?.pending === true
-      const isDone = entry.metadata?.done === true
+      const isPending = entry.metadata?.type === 'pending'
+      const isDone = entry.metadata?.type === 'done'
       const messageAttachments = (entry.metadata?.attachments ??
         []) as AttachmentMeta[]
       // Skip empty user messages (no text, no attachments, not pending/done)
@@ -361,21 +359,14 @@ function AssistantMessage({
   durationMs?: number
 }) {
   const { t } = useTranslation()
-  const [raw, setRaw] = useState(false)
 
   return (
     <div className="group px-5 py-1.5 animate-message-enter">
       <div className="min-w-0 max-w-[72ch]">
-        {raw ? (
-          <pre className="text-[14px] whitespace-pre-wrap break-words font-mono leading-relaxed">
-            {content}
-          </pre>
-        ) : (
-          <MarkdownContent
-            content={content}
-            className="text-[14px] leading-[1.75]"
-          />
-        )}
+        <MarkdownContent
+          content={content}
+          className="text-[14px] leading-[1.75]"
+        />
       </div>
       <div className="flex items-center gap-2 mt-1">
         {timestamp ? (
@@ -389,18 +380,6 @@ function AssistantMessage({
             {t('session.duration', { time: formatDuration(durationMs) })}
           </span>
         ) : null}
-        <button
-          type="button"
-          onClick={() => setRaw((v) => !v)}
-          className={`h-4 w-4 shrink-0 rounded transition-all duration-200 ${
-            raw
-              ? 'text-foreground'
-              : 'text-muted-foreground/0 group-hover:text-muted-foreground/40 hover:!text-muted-foreground'
-          }`}
-          title={raw ? 'Markdown' : 'Source'}
-        >
-          <Code className="h-3 w-3 mx-auto" />
-        </button>
       </div>
     </div>
   )

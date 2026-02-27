@@ -27,7 +27,7 @@ function normalizePrompt(input: string): string {
 async function persistPendingMessage(
   issueId: string,
   prompt: string,
-  meta: Record<string, unknown> = { pending: true },
+  meta: Record<string, unknown> = { type: 'pending' },
 ): Promise<string> {
   const { ulid } = await import('ulid')
   const messageId = ulid()
@@ -53,6 +53,7 @@ async function persistPendingMessage(
       content: prompt.trim(),
       metadata: JSON.stringify(meta),
       timestamp: new Date().toISOString(),
+      visible: 1,
     })
   })
   return messageId
@@ -257,6 +258,7 @@ async function parseFollowUpBody(c: {
       permissionMode?: string
       busyAction?: string
       meta?: boolean
+      displayPrompt?: string
       files: File[]
     }
   | { ok: false; error: string }
@@ -272,6 +274,7 @@ async function parseFollowUpBody(c: {
     const permissionMode = fd.get('permissionMode')
     const busyAction = fd.get('busyAction')
     const meta = fd.get('meta')
+    const displayPrompt = fd.get('displayPrompt')
     const files: File[] = []
     for (const entry of fd.getAll('files')) {
       if (entry instanceof File) files.push(entry)
@@ -283,6 +286,7 @@ async function parseFollowUpBody(c: {
       permissionMode: typeof permissionMode === 'string' ? permissionMode : undefined,
       busyAction: typeof busyAction === 'string' ? busyAction : undefined,
       meta: meta === 'true' || meta === '1' ? true : undefined,
+      displayPrompt: typeof displayPrompt === 'string' ? displayPrompt : undefined,
       files,
     }
   }
@@ -341,23 +345,20 @@ session.post('/:id/follow-up', async (c) => {
   const attachmentsMeta =
     savedFiles.length > 0 ? { attachments: savedFiles.map(savedFileToMeta) } : {}
 
-  const metaFlag = parsed.meta ? { meta: true } : {}
-
   // Queue message for todo/done issues instead of rejecting
+  const pendingContent = parsed.displayPrompt ?? prompt
   if (issue.statusId === 'todo') {
-    const messageId = await persistPendingMessage(issueId, prompt, {
-      pending: true,
+    const messageId = await persistPendingMessage(issueId, pendingContent, {
+      type: 'pending',
       ...attachmentsMeta,
-      ...metaFlag,
     })
     if (savedFiles.length > 0) await insertAttachmentRecords(issueId, messageId, savedFiles)
     return c.json({ success: true, data: { issueId, messageId, queued: true } })
   }
   if (issue.statusId === 'done') {
-    const messageId = await persistPendingMessage(issueId, prompt, {
-      done: true,
+    const messageId = await persistPendingMessage(issueId, pendingContent, {
+      type: 'done',
       ...attachmentsMeta,
-      ...metaFlag,
     })
     if (savedFiles.length > 0) await insertAttachmentRecords(issueId, messageId, savedFiles)
     return c.json({ success: true, data: { issueId, messageId, queued: true } })
@@ -366,10 +367,9 @@ session.post('/:id/follow-up', async (c) => {
   // When the engine is actively processing a turn, queue message as pending
   // so it won't be ignored mid-turn. It will be auto-flushed after the turn settles.
   if (issue.statusId === 'working' && issueEngine.isTurnInFlight(issueId)) {
-    const messageId = await persistPendingMessage(issueId, prompt, {
-      pending: true,
+    const messageId = await persistPendingMessage(issueId, pendingContent, {
+      type: 'pending',
       ...attachmentsMeta,
-      ...metaFlag,
     })
     if (savedFiles.length > 0) await insertAttachmentRecords(issueId, messageId, savedFiles)
     logger.debug(
@@ -390,7 +390,7 @@ session.post('/:id/follow-up', async (c) => {
     )
     const followUpMeta: Record<string, unknown> = {
       ...attachmentsMeta,
-      ...(parsed.meta ? { meta: true } : {}),
+      ...(parsed.meta ? { type: 'system' } : {}),
     }
     const hasFollowUpMeta = Object.keys(followUpMeta).length > 0
     const result = await issueEngine.followUpIssue(
@@ -399,7 +399,7 @@ session.post('/:id/follow-up', async (c) => {
       parsed.model,
       parsed.permissionMode as 'auto' | 'supervised' | 'plan' | undefined,
       parsed.busyAction as 'queue' | 'cancel' | undefined,
-      savedFiles.length > 0 ? prompt || undefined : undefined,
+      parsed.displayPrompt ?? (savedFiles.length > 0 ? prompt || undefined : undefined),
       hasFollowUpMeta ? followUpMeta : undefined,
     )
     await markPendingMessagesDispatched(pendingIds)

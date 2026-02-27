@@ -187,12 +187,15 @@ export function ChatInput({
               }))
             : undefined
         const metadata: Record<string, unknown> | undefined = isTodo
-          ? { pending: true, ...(filesMeta ? { attachments: filesMeta } : {}) }
+          ? {
+              type: 'pending',
+              ...(filesMeta ? { attachments: filesMeta } : {}),
+            }
           : isDone
-            ? { done: true, ...(filesMeta ? { attachments: filesMeta } : {}) }
+            ? { type: 'done', ...(filesMeta ? { attachments: filesMeta } : {}) }
             : isWorking && isThinking
               ? {
-                  pending: true,
+                  type: 'pending',
                   ...(filesMeta ? { attachments: filesMeta } : {}),
                 }
               : filesMeta

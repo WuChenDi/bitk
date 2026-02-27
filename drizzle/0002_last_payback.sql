@@ -1,1 +1,0 @@
-ALTER TABLE `issues` ADD `dev_mode` integer DEFAULT false NOT NULL;

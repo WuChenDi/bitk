@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Bug, Calendar, ChevronDown, Sparkles } from 'lucide-react'
+import { Bug, Calendar, ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Issue, Priority } from '@/types/kanban'
 import type { StatusDefinition, StatusId } from '@/lib/statuses'
@@ -27,21 +27,14 @@ export function IssueDetail({
   issue,
   status,
   onUpdate,
-  onAutoTitle,
-  isAutoTitling,
 }: {
   issue: Issue
   status?: StatusDefinition
   onUpdate?: (
     fields: Partial<Pick<Issue, 'statusId' | 'priority' | 'devMode'>>,
   ) => void
-  onAutoTitle?: () => void
-  isAutoTitling?: boolean
 }) {
   const { t, i18n } = useTranslation()
-  const canAutoTitle =
-    issue.statusId === 'working' &&
-    (issue.sessionStatus === 'running' || issue.sessionStatus === 'completed')
 
   return (
     <div className="shrink-0 relative z-20 flex items-center gap-1.5 px-4 py-1.5 border-t border-border/40 bg-muted/20">
@@ -70,23 +63,6 @@ export function IssueDetail({
       >
         <Bug className="h-3 w-3" />
         <span>{t('issue.dev')}</span>
-      </button>
-
-      {/* Auto-title */}
-      <button
-        type="button"
-        onClick={onAutoTitle}
-        disabled={!canAutoTitle || isAutoTitling}
-        className={`${badgeBase} cursor-pointer transition-colors ${
-          isAutoTitling
-            ? 'border-violet-400/40 bg-violet-500/10 text-violet-600 dark:text-violet-400 animate-pulse'
-            : canAutoTitle
-              ? 'border-border/50 bg-muted/20 text-muted-foreground/60 hover:text-violet-600 dark:hover:text-violet-400 hover:border-violet-400/40 hover:bg-violet-500/10'
-              : 'border-border/50 bg-muted/20 text-muted-foreground/30 cursor-not-allowed'
-        }`}
-        title={t('issue.autoTitle')}
-      >
-        <Sparkles className="h-3 w-3" />
       </button>
 
       {/* Created */}

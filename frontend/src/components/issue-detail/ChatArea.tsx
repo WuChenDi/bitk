@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Link, Check, Plus } from 'lucide-react'
+import { ArrowLeft, Link, Check, Plus, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useIssue, useUpdateIssue } from '@/hooks/use-kanban'
+import { useAutoTitleIssue, useIssue, useUpdateIssue } from '@/hooks/use-kanban'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { ChatBody } from './ChatBody'
 import { DiffPanel } from './DiffPanel'
@@ -38,6 +38,7 @@ export function ChatArea({
   const [titleDraft, setTitleDraft] = useState('')
   const isMobile = useIsMobile()
   const updateIssue = useUpdateIssue(projectId)
+  const autoTitle = useAutoTitleIssue(projectId)
 
   const saveTitle = useCallback(() => {
     const trimmed = titleDraft.trim()
@@ -134,6 +135,22 @@ export function ChatArea({
               )}
             </div>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className={`h-7 w-7 shrink-0 transition-colors ${
+              autoTitle.isPending
+                ? 'text-violet-600 dark:text-violet-400 animate-pulse'
+                : issue.sessionStatus
+                  ? 'text-muted-foreground hover:text-violet-600 dark:hover:text-violet-400'
+                  : 'text-muted-foreground/30 cursor-not-allowed'
+            }`}
+            title={t('issue.autoTitle')}
+            disabled={!issue.sessionStatus || autoTitle.isPending}
+            onClick={() => autoTitle.mutate(issueId)}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+          </Button>
           {!issue.parentIssueId ? (
             <Button
               variant="ghost"

@@ -75,7 +75,7 @@ export function useIssueStream({
     ) => {
       const trimmed = content.trim()
       if (!trimmed) return
-      if (!metadata?.pending) {
+      if (metadata?.type !== 'pending') {
         doneReceivedRef.current = false
       }
       setLogs((prev) =>

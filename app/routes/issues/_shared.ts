@@ -69,6 +69,7 @@ export const followUpSchema = z.object({
   permissionMode: z.enum(['auto', 'supervised', 'plan']).optional(),
   busyAction: z.enum(['queue', 'cancel']).optional(),
   meta: z.boolean().optional(),
+  displayPrompt: z.string().max(500).optional(),
 })
 
 export type IssueRow = typeof issuesTable.$inferSelect

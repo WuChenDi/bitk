@@ -93,6 +93,7 @@ export const issueLogs = sqliteTable(
     replyToMessageId: text('reply_to_message_id'),
     timestamp: text('timestamp'),
     toolCallRefId: text('tool_call_ref_id'), // FK to issue_logs_tools_call.id (app-level, no DB FK to avoid circular ref)
+    visible: integer('visible').notNull().default(1),
     ...commonFields,
   },
   (table) => [
