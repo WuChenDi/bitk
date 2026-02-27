@@ -271,8 +271,22 @@ export function useFollowUpIssue(projectId: string) {
   })
 }
 
-const AUTO_TITLE_PROMPT =
-  '用10字以内总结当前会话标题，严格按此格式回复：>>ISS标题ISS<<（注意结尾是两个<）。除此格式外不要输出任何其他文字。'
+const AUTO_TITLE_PROMPT = `你是一个标题生成器。你的唯一任务是为给定内容生成标题。
+
+## 严格规则
+1. 只输出一行，格式为：<bitk><title>标题</title></bitk>
+2. 禁止输出任何其他文字、解释、换行或空格
+3. 标题长度不超过 15 个字
+4. 不要使用引号包裹标题
+
+## 正确示例
+输入：今天天气很好，我和朋友去公园散步，看到了很多花。
+输出：<bitk><title>公园赏花散步记</title></bitk>
+
+## 错误示例（禁止）
+以下是标题：<bitk><title>公园散步</title></bitk>
+<bitk><title>公园散步</title></bitk> 这个标题概括了...
+\`\`\`<bitk><title>公园散步</title></bitk>\`\`\``
 
 export function useAutoTitleIssue(projectId: string) {
   const queryClient = useQueryClient()
@@ -334,6 +348,14 @@ export function useSlashCommands(
     queryFn: () => kanbanApi.getSlashCommands(projectId, issueId),
     enabled: !!projectId && !!issueId && enabled,
     staleTime: 60_000,
+  })
+}
+
+export function useGlobalSlashCommands() {
+  return useQuery({
+    queryKey: ['settings', 'slash-commands'],
+    queryFn: () => kanbanApi.getSlashCommandSettings(),
+    staleTime: Infinity,
   })
 }
 
