@@ -7,21 +7,17 @@ import { logger } from '../../logger'
 // ---------- Auto-title prompt ----------
 
 export const AUTO_TITLE_PROMPT = [
-  'You are a title generator. Summarize the current conversation into a short title.',
+  '[SYSTEM TASK] Generate a short title for this conversation.',
+  'Reply with ONLY the title wrapped in the exact format below — nothing else.',
   '',
-  '## Strict rules',
-  '1. Output exactly one line in this format: <bitk><title>TITLE</title></bitk>',
-  '2. Do NOT output any other text, explanation, newline, or whitespace',
-  '3. Title must be 50 characters or fewer',
-  '4. Do NOT wrap the title in quotes',
+  'Format: <bitk><title>TITLE</title></bitk>',
   '',
-  '## Correct example',
-  'Output: <bitk><title>Park walk with friends</title></bitk>',
+  'Rules:',
+  '- 50 characters max',
+  '- No quotes around the title',
+  '- No extra text, explanation, or markdown',
   '',
-  '## Wrong examples (forbidden)',
-  'Here is the title: <bitk><title>Park walk</title></bitk>',
-  '<bitk><title>Park walk</title></bitk> This title summarises...',
-  '```<bitk><title>Park walk</title></bitk>```',
+  'Example: <bitk><title>Fix login page crash</title></bitk>',
 ].join('\n')
 
 // ---------- Title extraction ----------
