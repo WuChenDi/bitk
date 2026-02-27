@@ -131,7 +131,10 @@
     "tooManyFiles": "文件数量过多（最多 {{max}} 个）",
     "removeFile": "删除文件",
     "unknownType": "未知类型",
-    "closePreview": "关闭预览"
+    "closePreview": "关闭预览",
+    "commands": "命令",
+    "commandSearch": "搜索命令...",
+    "noCommands": "没有匹配的命令"
   },
   "diff": {
     "changes": "更改",

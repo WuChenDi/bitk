@@ -131,7 +131,10 @@
     "tooManyFiles": "Too many files (max {{max}})",
     "removeFile": "Remove file",
     "unknownType": "Unknown type",
-    "closePreview": "Close preview"
+    "closePreview": "Close preview",
+    "commands": "Commands",
+    "commandSearch": "Search commands...",
+    "noCommands": "No matching commands"
   },
   "diff": {
     "changes": "Changes",
