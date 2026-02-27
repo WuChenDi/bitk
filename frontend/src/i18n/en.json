@@ -168,7 +168,8 @@
       "fullCommand": "Full Command"
     },
     "restart": "Restart",
-    "restarting": "Restarting..."
+    "restarting": "Restarting...",
+    "contextCompacted": "Context compacted"
   },
   "directory": {
     "browse": "Browse Directory",

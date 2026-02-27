@@ -42,6 +42,7 @@ export function ChatInput({
   statusId,
   isThinking = false,
   onMessageSent,
+  slashCommands = [],
 }: {
   projectId?: string
   issueId?: string
@@ -58,6 +59,7 @@ export function ChatInput({
     prompt: string,
     metadata?: Record<string, unknown>,
   ) => void
+  slashCommands?: string[]
 }) {
   const { t } = useTranslation()
   const [input, setInput] = useState('')
@@ -96,6 +98,19 @@ export function ChatInput({
       ? 'queue'
       : busyAction
     : undefined
+
+  // Slash command autocomplete
+  const [slashOpen, setSlashOpen] = useState(false)
+  const [slashIndex, setSlashIndex] = useState(0)
+  const slashDropdownRef = useRef<HTMLDivElement>(null)
+
+  const filteredSlashCommands = useMemo(() => {
+    if (!slashOpen || slashCommands.length === 0) return []
+    const trimmed = input.trim()
+    if (!trimmed.startsWith('/')) return []
+    const query = trimmed.toLowerCase()
+    return slashCommands.filter((cmd) => cmd.toLowerCase().startsWith(query))
+  }, [slashOpen, slashCommands, input])
 
   const normalizedPrompt = normalizePrompt(input)
   const canSend =
@@ -214,7 +229,46 @@ export function ChatInput({
     }
   }
 
+  const selectSlashCommand = useCallback((cmd: string) => {
+    setInput(cmd)
+    setSlashOpen(false)
+    setSlashIndex(0)
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.focus()
+    }
+  }, [])
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Slash command navigation
+    if (slashOpen && filteredSlashCommands.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setSlashIndex((i) => (i + 1) % filteredSlashCommands.length)
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setSlashIndex(
+          (i) =>
+            (i - 1 + filteredSlashCommands.length) %
+            filteredSlashCommands.length,
+        )
+        return
+      }
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        e.preventDefault()
+        selectSlashCommand(filteredSlashCommands[slashIndex])
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setSlashOpen(false)
+        return
+      }
+    }
+
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault()
       handleSend()
@@ -223,12 +277,26 @@ export function ChatInput({
 
   const handleInput = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      setInput(e.target.value)
+      const val = e.target.value
+      setInput(val)
       const el = e.target
       el.style.height = 'auto'
       el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+
+      // Open slash autocomplete when typing "/" at the start
+      const trimmed = val.trim()
+      if (
+        trimmed.startsWith('/') &&
+        slashCommands.length > 0 &&
+        !trimmed.includes(' ')
+      ) {
+        setSlashOpen(true)
+        setSlashIndex(0)
+      } else {
+        setSlashOpen(false)
+      }
     },
-    [],
+    [slashCommands],
   )
 
   const handlePaste = useCallback(
@@ -339,6 +407,29 @@ export function ChatInput({
         {sendError ? (
           <div className="mx-3 mt-2 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive">
             {sendError}
+          </div>
+        ) : null}
+
+        {/* Slash command autocomplete dropdown */}
+        {slashOpen && filteredSlashCommands.length > 0 ? (
+          <div
+            ref={slashDropdownRef}
+            className="mx-3 mt-1.5 rounded-lg border border-border/60 bg-popover/95 backdrop-blur-sm py-1 shadow-xl text-xs text-popover-foreground max-h-[200px] overflow-y-auto"
+          >
+            {filteredSlashCommands.map((cmd, idx) => (
+              <button
+                key={cmd}
+                type="button"
+                onClick={() => selectSlashCommand(cmd)}
+                className={`flex items-center gap-2 w-full px-3 py-1.5 text-left transition-colors ${
+                  idx === slashIndex
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'hover:bg-accent/50'
+                }`}
+              >
+                <code className="font-mono text-xs">{cmd}</code>
+              </button>
+            ))}
           </div>
         ) : null}
 

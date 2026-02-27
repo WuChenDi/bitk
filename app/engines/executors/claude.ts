@@ -457,6 +457,19 @@ export class ClaudeCodeExecutor implements EngineExecutor {
                 subtype: data.subtype,
                 sessionId: data.session_id,
                 cwd: data.cwd,
+                slashCommands: Array.isArray(data.slash_commands) ? data.slash_commands : [],
+              },
+            }
+          }
+          // compact_boundary: context compacted
+          if (data.subtype === 'compact_boundary') {
+            return {
+              entryType: 'system-message',
+              content: 'Context compacted',
+              timestamp: data.timestamp,
+              metadata: {
+                subtype: data.subtype,
+                compactMetadata: data.compact_metadata,
               },
             }
           }

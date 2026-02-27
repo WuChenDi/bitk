@@ -50,7 +50,7 @@ async function persistPendingMessage(
       turnIndex,
       entryIndex,
       entryType: 'user-message',
-      content: prompt.trim(),
+      content: (typeof meta.displayPrompt === 'string' ? meta.displayPrompt : prompt).trim(),
       metadata: JSON.stringify(meta),
       timestamp: new Date().toISOString(),
       visible: 1,
@@ -346,20 +346,19 @@ session.post('/:id/follow-up', async (c) => {
     savedFiles.length > 0 ? { attachments: savedFiles.map(savedFileToMeta) } : {}
 
   // Queue message for todo/done issues instead of rejecting
-  const pendingContent = parsed.displayPrompt ?? prompt
+  // Always store original prompt for engine use; displayPrompt goes in metadata for UI display
+  const pendingMeta = (type: string) => ({
+    type,
+    ...attachmentsMeta,
+    ...(parsed.displayPrompt ? { displayPrompt: parsed.displayPrompt } : {}),
+  })
   if (issue.statusId === 'todo') {
-    const messageId = await persistPendingMessage(issueId, pendingContent, {
-      type: 'pending',
-      ...attachmentsMeta,
-    })
+    const messageId = await persistPendingMessage(issueId, prompt, pendingMeta('pending'))
     if (savedFiles.length > 0) await insertAttachmentRecords(issueId, messageId, savedFiles)
     return c.json({ success: true, data: { issueId, messageId, queued: true } })
   }
   if (issue.statusId === 'done') {
-    const messageId = await persistPendingMessage(issueId, pendingContent, {
-      type: 'done',
-      ...attachmentsMeta,
-    })
+    const messageId = await persistPendingMessage(issueId, prompt, pendingMeta('done'))
     if (savedFiles.length > 0) await insertAttachmentRecords(issueId, messageId, savedFiles)
     return c.json({ success: true, data: { issueId, messageId, queued: true } })
   }
@@ -367,10 +366,7 @@ session.post('/:id/follow-up', async (c) => {
   // When the engine is actively processing a turn, queue message as pending
   // so it won't be ignored mid-turn. It will be auto-flushed after the turn settles.
   if (issue.statusId === 'working' && issueEngine.isTurnInFlight(issueId)) {
-    const messageId = await persistPendingMessage(issueId, pendingContent, {
-      type: 'pending',
-      ...attachmentsMeta,
-    })
+    const messageId = await persistPendingMessage(issueId, prompt, pendingMeta('pending'))
     if (savedFiles.length > 0) await insertAttachmentRecords(issueId, messageId, savedFiles)
     logger.debug(
       { issueId, promptChars: prompt.length, fileCount: files.length },
@@ -558,6 +554,24 @@ session.post('/:id/cancel', async (c) => {
       400,
     )
   }
+})
+
+// GET /api/projects/:projectId/issues/:id/slash-commands — Get available slash commands
+session.get('/:id/slash-commands', async (c) => {
+  const projectId = c.req.param('projectId')!
+  const project = await findProject(projectId)
+  if (!project) {
+    return c.json({ success: false, error: 'Project not found' }, 404)
+  }
+
+  const issueId = c.req.param('id')!
+  const issue = await getProjectOwnedIssue(project.id, issueId)
+  if (!issue) {
+    return c.json({ success: false, error: 'Issue not found' }, 404)
+  }
+
+  const commands = issueEngine.getSlashCommands(issueId)
+  return c.json({ success: true, data: { commands } })
 })
 
 export default session

@@ -174,6 +174,10 @@ export const kanbanApi = {
 
   getIssueLogs: (projectId: string, issueId: string) =>
     get<IssueLogsResponse>(`/api/projects/${projectId}/issues/${issueId}/logs`),
+  getSlashCommands: (projectId: string, issueId: string) =>
+    get<{ commands: string[] }>(
+      `/api/projects/${projectId}/issues/${issueId}/slash-commands`,
+    ),
   getIssueChanges: (projectId: string, issueId: string) =>
     get<IssueChangesResponse>(
       `/api/projects/${projectId}/issues/${issueId}/changes`,

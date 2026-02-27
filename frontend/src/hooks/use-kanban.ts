@@ -27,6 +27,8 @@ export const queryKeys = {
     ] as const,
   childIssues: (projectId: string, parentId: string) =>
     ['projects', projectId, 'issues', 'children', parentId] as const,
+  slashCommands: (projectId: string, issueId: string) =>
+    ['projects', projectId, 'issues', issueId, 'slash-commands'] as const,
 }
 
 export function useProjects() {
@@ -270,7 +272,7 @@ export function useFollowUpIssue(projectId: string) {
 }
 
 const AUTO_TITLE_PROMPT =
-  '请总结当前会话为一个简短的标题（10字以内），只返回固定格式 >>ISS + 标题 + ISS<< 不要返回其他内容'
+  '用10字以内总结当前会话标题，严格按此格式回复：>>ISS标题ISS<<（注意结尾是两个<）。除此格式外不要输出任何其他文字。'
 
 export function useAutoTitleIssue(projectId: string) {
   const queryClient = useQueryClient()
@@ -319,6 +321,19 @@ export function useCancelIssue(projectId: string) {
         queryKey: queryKeys.issue(projectId, issueId),
       })
     },
+  })
+}
+
+export function useSlashCommands(
+  projectId: string,
+  issueId: string,
+  enabled = false,
+) {
+  return useQuery({
+    queryKey: queryKeys.slashCommands(projectId, issueId),
+    queryFn: () => kanbanApi.getSlashCommands(projectId, issueId),
+    enabled: !!projectId && !!issueId && enabled,
+    staleTime: 60_000,
   })
 }
 

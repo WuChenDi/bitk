@@ -308,6 +308,18 @@ export function LogEntry({
       if (entry.metadata?.subtype === 'hook_completed') return null
       if (entry.metadata?.source === 'result') return null
       if (typeof entry.metadata?.duration === 'number') return null
+      // Compact boundary: show a visual divider
+      if (entry.metadata?.subtype === 'compact_boundary') {
+        return (
+          <div className="flex items-center gap-3 px-5 py-2 my-1">
+            <div className="flex-1 border-t border-dashed border-border/40" />
+            <span className="text-[10px] text-muted-foreground/50 font-medium whitespace-nowrap">
+              {t('session.contextCompacted')}
+            </span>
+            <div className="flex-1 border-t border-dashed border-border/40" />
+          </div>
+        )
+      }
       return (
         <div className="flex items-center gap-2 px-5 py-0.5 text-[11px] text-muted-foreground/60">
           <span className="truncate">{entry.content}</span>

@@ -50,6 +50,7 @@ interface ManagedProcess {
   /** True when the current turn was initiated by a meta follow-up (e.g. auto-title).
    *  All log entries in this turn will be tagged with `type: 'system'` and set visible=0. */
   metaTurn: boolean
+  slashCommands: string[]
   worktreePath?: string
   pendingInputs: Array<{
     prompt: string
@@ -93,7 +94,12 @@ function isAlwaysHidden(entry: NormalizedLogEntry): boolean {
 function isVisibleForMode(entry: NormalizedLogEntry, devMode: boolean): boolean {
   if (isAlwaysHidden(entry)) return false
   if (!devMode) {
-    return entry.entryType === 'user-message' || entry.entryType === 'assistant-message'
+    if (entry.entryType === 'user-message' || entry.entryType === 'assistant-message') return true
+    // compact_boundary dividers are always visible
+    if (entry.entryType === 'system-message' && entry.metadata?.subtype === 'compact_boundary') {
+      return true
+    }
+    return false
   }
   return true
 }
@@ -690,6 +696,11 @@ export class IssueEngine {
     return !!active && active.turnInFlight
   }
 
+  getSlashCommands(issueId: string): string[] {
+    const active = this.getActiveProcessForIssue(issueId)
+    return active?.slashCommands ?? []
+  }
+
   async cancelAll(): Promise<void> {
     const active = this.getActiveProcesses()
     await Promise.all(active.map((p) => this.cancel(p.executionId, { hard: true })))
@@ -746,6 +757,7 @@ export class IssueEngine {
       cancelledByUser: false,
       turnSettled: false,
       metaTurn: false,
+      slashCommands: [],
       devMode,
       worktreePath,
       pendingInputs: [],
@@ -1233,6 +1245,9 @@ export class IssueEngine {
     managed.logicalFailureReason = undefined
     managed.cancelledByUser = false
     managed.metaTurn = metadata?.type === 'system'
+    // Emit running state BEFORE user message so the frontend resets doneReceivedRef
+    // and accepts the subsequent user message SSE event.
+    this.emitStateChange(issueId, managed.executionId, 'running')
     const messageId = this.persistUserMessage(
       issueId,
       managed.executionId,
@@ -1250,7 +1265,6 @@ export class IssueEngine {
       },
       'issue_process_input_sent',
     )
-    this.emitStateChange(issueId, managed.executionId, 'running')
     return messageId
   }
 
@@ -1274,6 +1288,15 @@ export class IssueEngine {
           timestamp: rawEntry.timestamp ?? new Date().toISOString(),
         }
 
+        // Extract slash commands from SDK init message
+        if (
+          entry.entryType === 'system-message' &&
+          entry.metadata?.subtype === 'init' &&
+          Array.isArray(entry.metadata.slashCommands)
+        ) {
+          managed.slashCommands = entry.metadata.slashCommands as string[]
+        }
+
         // Tag all entries in a meta turn so they are hidden from the frontend
         if (managed.metaTurn) {
           entry.metadata = { ...entry.metadata, type: 'system' }
@@ -1281,7 +1304,7 @@ export class IssueEngine {
 
         // Intercept auto-title pattern from AI response in meta turns
         if (managed.metaTurn && entry.entryType === 'assistant-message') {
-          const match = entry.content.match(/>>ISS(.+?)ISS<</)
+          const match = entry.content.match(/>>ISS(.+?)ISS<{1,2}/)
           if (match) {
             const title = match[1].trim().slice(0, 200)
             if (title) {
@@ -1392,25 +1415,16 @@ export class IssueEngine {
   private handleTurnCompleted(issueId: string, executionId: string): void {
     const managed = this.processes.get(executionId)
     if (!managed || managed.state !== 'running') return
-    const wasMetaTurn = managed.metaTurn
     managed.turnInFlight = false
     managed.queueCancelRequested = false
     managed.metaTurn = false
     logger.debug(
-      { issueId, executionId, queued: managed.pendingInputs.length, wasMetaTurn },
+      { issueId, executionId, queued: managed.pendingInputs.length },
       'issue_turn_completed',
     )
 
     if (managed.pendingInputs.length > 0) {
       void this.flushQueuedInputs(issueId, managed)
-      return
-    }
-
-    // Meta turns (auto-title, etc.) are invisible side-effects.
-    // Keep the session status as 'running' and skip review transition
-    // so the issue stays in working and the subprocess remains usable.
-    if (wasMetaTurn) {
-      logger.info({ issueId, executionId }, 'meta_turn_completed_skip_settle')
       return
     }
 

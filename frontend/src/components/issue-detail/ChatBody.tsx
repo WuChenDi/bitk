@@ -1,5 +1,9 @@
 import { useRef } from 'react'
-import { useCancelIssue, useUpdateIssue } from '@/hooks/use-kanban'
+import {
+  useCancelIssue,
+  useSlashCommands,
+  useUpdateIssue,
+} from '@/hooks/use-kanban'
 import { useIssueStream } from '@/hooks/use-issue-stream'
 import { STATUS_MAP } from '@/lib/statuses'
 import type { Issue, NormalizedLogEntry } from '@/types/kanban'
@@ -124,6 +128,14 @@ export function ChatBody({
   const updateIssue = useUpdateIssue(projectId)
   const cancelIssue = useCancelIssue(projectId)
 
+  const hasSession = !!issue?.sessionStatus
+  const { data: slashCommandsData } = useSlashCommands(
+    projectId,
+    issueId,
+    hasSession,
+  )
+  const slashCommands = slashCommandsData?.commands ?? []
+
   const { logs, isThinking, workingStep, isTodo, isDone, appendServerMessage } =
     useSessionState(projectId, issueId, issue)
 
@@ -163,6 +175,7 @@ export function ChatBody({
         sessionStatus={issue.sessionStatus}
         statusId={issue.statusId}
         isThinking={isThinking}
+        slashCommands={slashCommands}
         onMessageSent={(messageId, prompt, metadata) => {
           appendServerMessage(messageId, prompt, metadata)
         }}
