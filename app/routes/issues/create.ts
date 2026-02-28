@@ -36,10 +36,10 @@ create.post(
     let resolvedModel = body.model ?? null
 
     if (!resolvedEngine) {
-      resolvedEngine = (await getDefaultEngine()) || 'echo'
+      resolvedEngine = ((await getDefaultEngine()) || 'echo') as EngineType
     }
     if (!resolvedModel) {
-      const savedModel = await getEngineDefaultModel(resolvedEngine)
+      const savedModel = await getEngineDefaultModel(resolvedEngine!)
       if (savedModel) {
         resolvedModel = savedModel
       } else {

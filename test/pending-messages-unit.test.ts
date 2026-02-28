@@ -95,8 +95,8 @@ describe('getPendingMessages', () => {
 
     const pending = await getPendingMessages(issue.id)
     expect(pending.length).toBe(2)
-    expect(pending[0].content).toBe('hello pending')
-    expect(pending[1].content).toBe('another pending')
+    expect(pending[0]!.content).toBe('hello pending')
+    expect(pending[1]!.content).toBe('another pending')
   })
 
   test('returns only messages with metadata.pending=true', async () => {
@@ -159,11 +159,11 @@ describe('getPendingMessages', () => {
 
     const pending1 = await getPendingMessages(issue1.id)
     expect(pending1.length).toBe(1)
-    expect(pending1[0].content).toBe('for issue 1')
+    expect(pending1[0]!.content).toBe('for issue 1')
 
     const pending2 = await getPendingMessages(issue2.id)
     expect(pending2.length).toBe(1)
-    expect(pending2[0].content).toBe('for issue 2')
+    expect(pending2[0]!.content).toBe('for issue 2')
   })
 })
 
@@ -181,11 +181,11 @@ describe('markPendingMessagesDispatched', () => {
     expect(pending.length).toBe(2)
 
     // Mark only the first one as dispatched
-    await markPendingMessagesDispatched([pending[0].id])
+    await markPendingMessagesDispatched([pending[0]!.id])
 
     const remaining = await getPendingMessages(issue.id)
     expect(remaining.length).toBe(1)
-    expect(remaining[0].content).toBe('to keep pending')
+    expect(remaining[0]!.content).toBe('to keep pending')
   })
 
   test('marks all pending messages as dispatched when given all IDs', async () => {
@@ -264,10 +264,10 @@ describe('Pending message lifecycle', () => {
 
     const pending = await getPendingMessages(issue.id)
     expect(pending.length).toBe(1)
-    expect(pending[0].content).toBe(specialContent)
+    expect(pending[0]!.content).toBe(specialContent)
 
     // Verify the metadata is valid JSON with pending=true
-    const metadata = JSON.parse(pending[0].metadata!)
+    const metadata = JSON.parse(pending[0]!.metadata!)
     expect(metadata.pending).toBe(true)
   })
 

@@ -33,8 +33,8 @@ describe('ClaudeLogNormalizer', () => {
         }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].entryType).toBe('assistant-message')
-      expect(entries[0].content).toBe('Hello world')
+      expect(entries[0]!.entryType).toBe('assistant-message')
+      expect(entries[0]!.content).toBe('Hello world')
     })
 
     test('assistant with tool_use', () => {
@@ -53,9 +53,9 @@ describe('ClaudeLogNormalizer', () => {
         }),
       )
       expect(entries).toHaveLength(2)
-      expect(entries[0].entryType).toBe('assistant-message')
-      expect(entries[1].entryType).toBe('tool-use')
-      expect(entries[1].content).toBe('Tool: Read')
+      expect(entries[0]!.entryType).toBe('assistant-message')
+      expect(entries[1]!.entryType).toBe('tool-use')
+      expect(entries[1]!.content).toBe('Tool: Read')
     })
 
     test('standalone tool_use', () => {
@@ -64,8 +64,8 @@ describe('ClaudeLogNormalizer', () => {
         line({ type: 'tool_use', name: 'Bash', id: 'tu_2', input: { command: 'ls' } }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].entryType).toBe('tool-use')
-      expect(entries[0].toolAction?.kind).toBe('command-run')
+      expect(entries[0]!.entryType).toBe('tool-use')
+      expect(entries[0]!.toolAction?.kind).toBe('command-run')
     })
 
     test('tool_result', () => {
@@ -74,8 +74,8 @@ describe('ClaudeLogNormalizer', () => {
         line({ type: 'tool_result', tool_use_id: 'tu_2', content: 'file.txt' }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].entryType).toBe('tool-use')
-      expect(entries[0].metadata?.isResult).toBe(true)
+      expect(entries[0]!.entryType).toBe('tool-use')
+      expect(entries[0]!.metadata?.isResult).toBe(true)
     })
 
     test('error message', () => {
@@ -84,8 +84,8 @@ describe('ClaudeLogNormalizer', () => {
         line({ type: 'error', error: { type: 'api_error', message: 'Rate limit' } }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].entryType).toBe('error-message')
-      expect(entries[0].content).toBe('Rate limit')
+      expect(entries[0]!.entryType).toBe('error-message')
+      expect(entries[0]!.content).toBe('Rate limit')
     })
 
     test('system init', () => {
@@ -94,8 +94,8 @@ describe('ClaudeLogNormalizer', () => {
         line({ type: 'system', subtype: 'init', session_id: 's1', cwd: '/home' }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].entryType).toBe('system-message')
-      expect(entries[0].content).toContain('/home')
+      expect(entries[0]!.entryType).toBe('system-message')
+      expect(entries[0]!.content).toContain('/home')
     })
 
     test('result with metrics', () => {
@@ -111,9 +111,9 @@ describe('ClaudeLogNormalizer', () => {
         }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].entryType).toBe('system-message')
-      expect(entries[0].content).toContain('5.0s')
-      expect(entries[0].metadata?.turnCompleted).toBe(true)
+      expect(entries[0]!.entryType).toBe('system-message')
+      expect(entries[0]!.content).toContain('5.0s')
+      expect(entries[0]!.metadata?.turnCompleted).toBe(true)
     })
 
     test('thinking-only blocks return null', () => {
@@ -143,7 +143,7 @@ describe('ClaudeLogNormalizer', () => {
         line({ type: 'tool_use', name: 'Bash', id: 'tu_bash1', input: { command: 'echo hi' } }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].content).toBe('Tool: Bash')
+      expect(entries[0]!.content).toBe('Tool: Bash')
     })
   })
 
@@ -165,8 +165,8 @@ describe('ClaudeLogNormalizer', () => {
         }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].entryType).toBe('assistant-message')
-      expect(entries[0].content).toBe('Let me check')
+      expect(entries[0]!.entryType).toBe('assistant-message')
+      expect(entries[0]!.content).toBe('Let me check')
     })
 
     test('all tool_use filtered + no text → null', () => {
@@ -197,8 +197,8 @@ describe('ClaudeLogNormalizer', () => {
         }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].entryType).toBe('tool-use')
-      expect(entries[0].content).toBe('Tool: Edit')
+      expect(entries[0]!.entryType).toBe('tool-use')
+      expect(entries[0]!.content).toBe('Tool: Edit')
     })
   })
 
@@ -231,7 +231,7 @@ describe('ClaudeLogNormalizer', () => {
         line({ type: 'tool_result', tool_use_id: 'tu_corr2', content: 'output' }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].content).toBe('output')
+      expect(entries[0]!.content).toBe('output')
     })
 
     test('user message with tool_result blocks — filtered ones removed', () => {
@@ -265,7 +265,7 @@ describe('ClaudeLogNormalizer', () => {
         }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].content).toBe('edit result')
+      expect(entries[0]!.content).toBe('edit result')
     })
 
     test('user message with all tool_results filtered → null', () => {
@@ -309,7 +309,7 @@ describe('ClaudeLogNormalizer', () => {
         line({ type: 'tool_use', name: 'Edit', id: 'tu_edit', input: { file_path: '/x' } }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].content).toBe('Tool: Edit')
+      expect(entries[0]!.content).toBe('Tool: Edit')
     })
 
     test('Bash passes through', () => {
@@ -318,7 +318,7 @@ describe('ClaudeLogNormalizer', () => {
         line({ type: 'tool_use', name: 'Bash', id: 'tu_bash', input: { command: 'echo' } }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].content).toBe('Tool: Bash')
+      expect(entries[0]!.content).toBe('Tool: Bash')
     })
 
     test('Write passes through', () => {
@@ -327,7 +327,7 @@ describe('ClaudeLogNormalizer', () => {
         line({ type: 'tool_use', name: 'Write', id: 'tu_write', input: { file_path: '/w' } }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].content).toBe('Tool: Write')
+      expect(entries[0]!.content).toBe('Tool: Write')
     })
   })
 
@@ -337,8 +337,8 @@ describe('ClaudeLogNormalizer', () => {
     test('invalid JSON returns system-message with raw content', () => {
       const entries = parseAll(normalizer, 'this is not json')
       expect(entries).toHaveLength(1)
-      expect(entries[0].entryType).toBe('system-message')
-      expect(entries[0].content).toBe('this is not json')
+      expect(entries[0]!.entryType).toBe('system-message')
+      expect(entries[0]!.content).toBe('this is not json')
     })
 
     test('empty/whitespace returns null', () => {
@@ -362,7 +362,7 @@ describe('ClaudeLogNormalizer', () => {
         line({ type: 'tool_use', name: 'Read', id: 'tu_dis1', input: { file_path: '/d' } }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].content).toBe('Tool: Read')
+      expect(entries[0]!.content).toBe('Tool: Read')
     })
   })
 
@@ -375,8 +375,8 @@ describe('ClaudeLogNormalizer', () => {
         line({ type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hi' } }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].entryType).toBe('assistant-message')
-      expect(entries[0].content).toBe('Hi')
+      expect(entries[0]!.entryType).toBe('assistant-message')
+      expect(entries[0]!.content).toBe('Hi')
     })
 
     test('thinking_delta returns null', () => {
@@ -401,8 +401,8 @@ describe('ClaudeLogNormalizer', () => {
         }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].entryType).toBe('system-message')
-      expect(entries[0].content).toBe('cost info')
+      expect(entries[0]!.entryType).toBe('system-message')
+      expect(entries[0]!.content).toBe('cost info')
     })
   })
 
@@ -422,7 +422,7 @@ describe('ClaudeLogNormalizer', () => {
         line({ type: 'tool_result', tool_use_id: 'tu_clean1', content: 'duplicate' }),
       )
       expect(entries).toHaveLength(1)
-      expect(entries[0].content).toBe('duplicate')
+      expect(entries[0]!.content).toBe('duplicate')
     })
   })
 })

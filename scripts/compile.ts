@@ -115,8 +115,8 @@ await Bun.write(MIGRATIONS_FILE, migrationsCode)
 console.log(`[compile] Generated embedded-migrations.ts (${migrationFiles.length} files)`)
 
 // ---------- 5. Compile to single binary ----------
-const target = args.target ?? null
-const outfile = resolve(ROOT, args.outfile ?? 'bitk')
+const target = (args.target as string | undefined) ?? null
+const outfile = resolve(ROOT, (args.outfile as string | undefined) ?? 'bitk')
 console.log(`[compile] Compiling binary...${target ? ` (target: ${target})` : ''}`)
 const version = args.version ?? 'dev'
 const gitCommit = Bun.spawnSync(['git', 'rev-parse', '--short', 'HEAD'], { cwd: ROOT })

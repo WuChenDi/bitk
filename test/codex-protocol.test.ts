@@ -53,7 +53,7 @@ describe('CodexProtocolHandler', () => {
 
     // Verify the request was written
     expect(written.length).toBeGreaterThanOrEqual(1)
-    const req = JSON.parse(written[0])
+    const req = JSON.parse(written[0]!)
     expect(req.id).toBe(1)
     expect(req.method).toBe('initialize')
     expect(req.params.clientInfo.name).toBe('bitk')
@@ -67,7 +67,7 @@ describe('CodexProtocolHandler', () => {
     // After initialize resolves, it sends 'initialized' notification
     // written[0] = initialize request, written[1] = initialized notification
     expect(written.length).toBeGreaterThanOrEqual(2)
-    const notif = JSON.parse(written[1])
+    const notif = JSON.parse(written[1]!)
     expect(notif.method).toBe('initialized')
     expect(notif.id).toBeUndefined()
 
@@ -85,7 +85,7 @@ describe('CodexProtocolHandler', () => {
     await tick()
 
     // Verify the request
-    const req = JSON.parse(written[0])
+    const req = JSON.parse(written[0]!)
     expect(req.method).toBe('thread/start')
     expect(req.params.model).toBe('o3')
     expect(req.params.cwd).toBe('/tmp')
@@ -128,7 +128,7 @@ describe('CodexProtocolHandler', () => {
     const turnPromise = handler.startTurn('thread-abc', 'Hello world')
     await tick()
 
-    const req = JSON.parse(written[0])
+    const req = JSON.parse(written[0]!)
     expect(req.method).toBe('turn/start')
     expect(req.params.threadId).toBe('thread-abc')
     expect(req.params.input).toEqual([{ type: 'text', text: 'Hello world' }])
@@ -276,7 +276,7 @@ describe('CodexProtocolHandler', () => {
     // Start a turn to set turnId
     const turnPromise = handler.startTurn('t1', 'test')
     await tick()
-    const req = JSON.parse(written[0])
+    const req = JSON.parse(written[0]!)
     stdout.push(JSON.stringify({ id: req.id, result: { turn: { id: 'turn-x' } } }))
     await turnPromise
 
@@ -326,7 +326,7 @@ describe('CodexProtocolHandler', () => {
     const promise = handler.startThread({})
     await tick()
 
-    const req = JSON.parse(written[0])
+    const req = JSON.parse(written[0]!)
     stdout.push(
       JSON.stringify({ id: req.id, error: { code: -1, message: 'thread creation failed' } }),
     )
@@ -367,7 +367,7 @@ describe('CodexProtocolHandler', () => {
     const resumePromise = handler.resumeThread('existing-thread')
     await tick()
 
-    const req = JSON.parse(written[0])
+    const req = JSON.parse(written[0]!)
     expect(req.method).toBe('thread/resume')
     expect(req.params.threadId).toBe('existing-thread')
 
@@ -389,7 +389,7 @@ describe('CodexProtocolHandler', () => {
     // Manually set threadId by sending a request and responding
     const threadPromise = handler.startThread({})
     await tick()
-    const req = JSON.parse(written[0])
+    const req = JSON.parse(written[0]!)
     stdout.push(JSON.stringify({ id: req.id, result: { thread: { id: 'thread-msg' } } }))
     await threadPromise
 

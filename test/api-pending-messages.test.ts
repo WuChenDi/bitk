@@ -88,7 +88,7 @@ describe('Follow-up queuing on todo issues', () => {
       (l) => l.entryType === 'user-message' && l.metadata?.pending === true,
     )
     expect(pendingMsgs.length).toBeGreaterThanOrEqual(1)
-    expect(pendingMsgs[0].content).toBe('pending log check')
+    expect(pendingMsgs[0]!.content).toBe('pending log check')
   })
 
   test('multiple queued messages accumulate', async () => {

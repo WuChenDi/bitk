@@ -188,7 +188,7 @@ app.get(
         }
 
         // Detach previous WS (if any)
-        entry.meta.wsRaw = ws.raw
+        entry.meta.wsRaw = ws.raw as WsLike
 
         logger.info({ id, pid: entry.subprocess.pid }, 'terminal_ws_attached')
       },

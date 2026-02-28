@@ -85,10 +85,13 @@ async function runLiveProbe(): Promise<EngineDiscovery> {
 
   for (let i = 0; i < results.length; i++) {
     const result = results[i]
+    const executor = executors[i]
+    if (!result || !executor) continue
     if (result.status !== 'fulfilled') {
-      const engineType = executors[i].engineType
+      const rejected = result as PromiseRejectedResult
+      const engineType = executor.engineType
       logger.warn(
-        { engineType, error: result.reason?.message ?? String(result.reason) },
+        { engineType, error: rejected.reason?.message ?? String(rejected.reason) },
         'probe_engine_failed',
       )
       // Return a safe fallback for timed-out / failed probes
@@ -96,19 +99,23 @@ async function runLiveProbe(): Promise<EngineDiscovery> {
         engineType,
         installed: false,
         authStatus: 'unknown',
-        error: result.reason?.message,
+        error: rejected.reason?.message,
       })
       continue
     }
 
-    const { availability, models: engineModels } = result.value
+    const fulfilled = result as PromiseFulfilledResult<{
+      availability: EngineAvailability
+      models: EngineModel[]
+    }>
+    const { availability, models: engineModels } = fulfilled.value
     engines.push(availability)
 
     if (availability.installed && engineModels.length > 0) {
       models[availability.engineType] = engineModels
     }
 
-    const defaultModel = engineModels.find((m) => m.isDefault)
+    const defaultModel = engineModels.find((m: EngineModel) => m.isDefault)
     logger.debug(
       {
         engineType: availability.engineType,

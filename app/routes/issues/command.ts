@@ -120,7 +120,6 @@ command.post(
           issueId,
           model: body.model,
           permissionMode: body.permissionMode,
-          busyAction: body.busyAction,
           error: error instanceof Error ? { message: error.message, stack: error.stack } : error,
         },
         'issue_followup_failed',

@@ -76,7 +76,7 @@ describe('Follow-up queuing behavior', () => {
       (l) => l.entryType === 'user-message' && l.metadata?.pending === true,
     )
     expect(pendingMsgs.length).toBeGreaterThanOrEqual(1)
-    expect(pendingMsgs[0].content).toBe('queued follow-up message')
+    expect(pendingMsgs[0]!.content).toBe('queued follow-up message')
   })
 
   test('multiple follow-ups on todo accumulate as pending entries', async () => {
