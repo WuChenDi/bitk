@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "dev": "bun --filter '*' dev",
+    "dev": "bun --filter @bitk/api --filter @bitk/frontend dev",
     "dev:api": "bun --filter @bitk/api dev",
     "dev:frontend": "bun --filter @bitk/frontend dev",
     "build": "bun --filter @bitk/frontend build",
