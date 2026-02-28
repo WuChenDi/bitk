@@ -25,10 +25,19 @@ export function handleStreamEntry(
     applyAutoTitle(issueId, entry.content)
   }
 
+  // Tag meta-turn assistant messages as system so they're hidden from normal view.
+  // The user-message is already tagged in persistUserMessage; this covers the response.
+  const effectiveEntry =
+    managed.metaTurn && entry.entryType === 'assistant-message'
+      ? { ...entry, metadata: { ...entry.metadata, type: 'system' } }
+      : entry
+
   // Persist first, then emit (DB is source of truth)
   // For tool-use entries, content & metadata are stored in the tools table only
-  const isToolUse = entry.entryType === 'tool-use'
-  const dbEntry = isToolUse ? { ...entry, content: '', metadata: undefined } : entry
+  const isToolUse = effectiveEntry.entryType === 'tool-use'
+  const dbEntry = isToolUse
+    ? { ...effectiveEntry, content: '', metadata: undefined }
+    : effectiveEntry
   const persisted = persistEntry(ctx, issueId, executionId, dbEntry)
   if (persisted) {
     if (isToolUse && persisted.messageId) {

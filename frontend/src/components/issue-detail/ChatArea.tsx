@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Link, Check, Plus, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -39,6 +39,48 @@ export function ChatArea({
   const isMobile = useIsMobile()
   const updateIssue = useUpdateIssue(projectId)
   const autoTitle = useAutoTitleIssue(projectId)
+  const [isAutoTitling, setIsAutoTitling] = useState(false)
+  const titleBeforeAutoRef = useRef<string | null>(null)
+
+  // Detect title change to clear auto-titling state
+  useEffect(() => {
+    if (isAutoTitling && titleBeforeAutoRef.current !== null && issue) {
+      if (issue.title !== titleBeforeAutoRef.current) {
+        setIsAutoTitling(false)
+        titleBeforeAutoRef.current = null
+      }
+    }
+  }, [isAutoTitling, issue?.title])
+
+  // Reset auto-titling when session fails
+  useEffect(() => {
+    if (isAutoTitling && issue?.sessionStatus === 'failed') {
+      setIsAutoTitling(false)
+      titleBeforeAutoRef.current = null
+    }
+  }, [isAutoTitling, issue?.sessionStatus])
+
+  // Safety timeout — clear auto-titling after 30s
+  useEffect(() => {
+    if (!isAutoTitling) return
+    const timer = setTimeout(() => {
+      setIsAutoTitling(false)
+      titleBeforeAutoRef.current = null
+    }, 30_000)
+    return () => clearTimeout(timer)
+  }, [isAutoTitling])
+
+  const handleAutoTitle = useCallback(() => {
+    if (!issue) return
+    titleBeforeAutoRef.current = issue.title
+    setIsAutoTitling(true)
+    autoTitle.mutate(issueId, {
+      onError: () => {
+        setIsAutoTitling(false)
+        titleBeforeAutoRef.current = null
+      },
+    })
+  }, [issue, autoTitle, issueId])
 
   const saveTitle = useCallback(() => {
     const trimmed = titleDraft.trim()
@@ -147,15 +189,15 @@ export function ChatArea({
             variant="ghost"
             size="icon"
             className={`h-7 w-7 shrink-0 transition-colors ${
-              autoTitle.isPending
+              isAutoTitling
                 ? 'text-violet-600 dark:text-violet-400 animate-pulse'
                 : issue.sessionStatus
                   ? 'text-muted-foreground hover:text-violet-600 dark:hover:text-violet-400'
                   : 'text-muted-foreground/30 cursor-not-allowed'
             }`}
             title={t('issue.autoTitle')}
-            disabled={!issue.sessionStatus || autoTitle.isPending}
-            onClick={() => autoTitle.mutate(issueId)}
+            disabled={!issue.sessionStatus || isAutoTitling}
+            onClick={handleAutoTitle}
           >
             <Sparkles className="h-3.5 w-3.5" />
           </Button>
