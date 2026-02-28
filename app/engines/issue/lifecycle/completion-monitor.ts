@@ -1,6 +1,8 @@
 import type { EngineType, ProcessStatus } from '../../types'
 import type { EngineContext } from '../context'
+import type { ManagedProcess } from '../types'
 import { logger } from '../../../logger'
+import { updateIssueSession } from '../../engine-store'
 import { MAX_AUTO_RETRIES } from '../constants'
 import { emitStateChange } from '../events'
 import { cleanupDomainData, syncPmState } from '../process/state'
@@ -8,6 +10,30 @@ import { dispatch } from '../state'
 import { getPidFromManaged } from '../utils/pid'
 import { settleIssue } from './settle'
 import { spawnFollowUpProcess, spawnRetry } from './spawn'
+
+// ---------- Helpers ----------
+
+/**
+ * Detect session ID error: the CLI spawned but couldn't find the session
+ * (e.g. "No conversation found with session ID: xxx" after project directory
+ * change).  Only returns true when the error specifically mentions the session,
+ * so other failures (API errors, network issues, etc.) don't clear a valid session.
+ */
+function isSessionIdError(managed: ManagedProcess): boolean {
+  if (managed.logs.toArray().some((l) => l.entryType === 'assistant-message')) return false
+  const reason = (managed.logicalFailureReason ?? '').toLowerCase()
+  return reason.includes('no conversation found') || reason.includes('session')
+}
+
+/**
+ * Clear the externalSessionId in DB so the next spawn creates a fresh session.
+ */
+async function resetBrokenSession(issueId: string, executionId: string): Promise<void> {
+  logger.warn({ issueId, executionId }, 'session_init_failure_resetting_session')
+  await updateIssueSession(issueId, { externalSessionId: null }).catch((e) =>
+    logger.error({ issueId, error: e }, 'session_reset_failed'),
+  )
+}
 
 // ---------- Completion monitoring ----------
 
@@ -44,6 +70,27 @@ export function monitorCompletion(
         if (finalState === 'completed') dispatch(managed, { type: 'MARK_COMPLETED' })
         else dispatch(managed, { type: 'MARK_FAILED' })
         syncPmState(ctx, executionId, finalState)
+
+        // When the turn was already settled as failed due to a session ID error,
+        // reset the session and auto-retry with a fresh session.
+        if (finalState === 'failed' && isSessionIdError(managed)) {
+          await resetBrokenSession(issueId, executionId)
+          if (!isRetry && managed.retryCount < MAX_AUTO_RETRIES) {
+            managed.retryCount++
+            logger.info(
+              { issueId, executionId, retryCount: managed.retryCount },
+              'auto_retry_after_session_reset',
+            )
+            cleanupDomainData(ctx, executionId)
+            try {
+              await spawnRetry(ctx, issueId, engineType)
+            } catch (retryErr) {
+              logger.error({ issueId, err: retryErr }, 'auto_retry_failed')
+            }
+            return
+          }
+        }
+
         cleanupDomainData(ctx, executionId)
         return
       }
@@ -111,6 +158,11 @@ export function monitorCompletion(
           },
           'issue_process_marked_failed',
         )
+
+        // Reset broken session before retry so spawnRetry creates a fresh one
+        if (isSessionIdError(managed)) {
+          await resetBrokenSession(issueId, executionId)
+        }
 
         // Auto-retry logic (in-memory only, no DB writes for retryCount)
         if (!isRetry && managed.retryCount < MAX_AUTO_RETRIES) {

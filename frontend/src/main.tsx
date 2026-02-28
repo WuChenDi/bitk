@@ -4,6 +4,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { Toaster } from './components/ui/sonner'
 import { TerminalDrawer } from './components/terminal/TerminalDrawer'
 import { useTerminalStore } from './stores/terminal-store'
 import { eventBus } from './lib/event-bus'
@@ -129,6 +130,7 @@ if (!rootElement.innerHTML) {
             </Suspense>
           </AppShell>
           <TerminalDrawer />
+          <Toaster position="top-center" />
         </ErrorBoundary>
       </BrowserRouter>
       {import.meta.env.DEV ? (

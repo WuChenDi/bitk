@@ -1,6 +1,6 @@
-import { useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import {
   useCancelIssue,
   useDeleteIssue,
@@ -134,6 +134,16 @@ export function ChatBody({
 
   const { logs, isThinking, workingStep, isTodo, isDone, appendServerMessage } =
     useSessionState(projectId, issueId, issue)
+
+  // Show toast when execution transitions to failed
+  const prevStatusRef = useRef(issue.sessionStatus)
+  useEffect(() => {
+    const prev = prevStatusRef.current
+    prevStatusRef.current = issue.sessionStatus
+    if (issue.sessionStatus === 'failed' && prev != null && prev !== 'failed') {
+      toast.error(t('session.executionFailed'))
+    }
+  }, [issue.sessionStatus, t])
 
   return (
     <>

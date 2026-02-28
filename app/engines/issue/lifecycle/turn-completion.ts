@@ -42,7 +42,31 @@ export function handleTurnCompleted(
 
   void (async () => {
     try {
-      await updateIssueSession(issueId, { sessionStatus: finalStatus })
+      // Detect session ID error: the CLI couldn't find the session
+      // (e.g. "No conversation found with session ID: xxx" after project
+      // directory change).  Only reset externalSessionId when the error
+      // specifically mentions the session, so other failures (API errors,
+      // network issues, etc.) don't clear a valid session.
+      const hasAssistantOutput = managed.logs
+        .toArray()
+        .some((l) => l.entryType === 'assistant-message')
+      const reason = (managed.logicalFailureReason ?? '').toLowerCase()
+      const isSessionError =
+        finalStatus === 'failed' &&
+        !hasAssistantOutput &&
+        (reason.includes('no conversation found') || reason.includes('session'))
+      if (isSessionError) {
+        logger.warn(
+          { issueId, executionId, reason: managed.logicalFailureReason },
+          'session_id_error_resetting_session',
+        )
+        await updateIssueSession(issueId, {
+          sessionStatus: finalStatus,
+          externalSessionId: null,
+        })
+      } else {
+        await updateIssueSession(issueId, { sessionStatus: finalStatus })
+      }
 
       // Check for pending DB messages before moving to review.
       // If the user sent messages while the engine was busy, they were queued

@@ -45,7 +45,7 @@ export async function updateIssueSession(
     engineType: string
     sessionStatus: string
     prompt: string
-    externalSessionId: string
+    externalSessionId: string | null
     model: string
     baseCommitHash: string
   }>,

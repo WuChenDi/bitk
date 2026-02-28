@@ -76,7 +76,7 @@ export class ClaudeCodeExecutor implements EngineExecutor {
       builder.param('--session-id', options.externalSessionId)
     }
 
-    if (options.model) {
+    if (options.model && options.model !== 'auto') {
       builder.param('--model', options.model)
     }
 
@@ -155,7 +155,7 @@ export class ClaudeCodeExecutor implements EngineExecutor {
       builder.param('--resume-session-at', options.resetToMessageId)
     }
 
-    if (options.model) {
+    if (options.model && options.model !== 'auto') {
       builder.param('--model', options.model)
     }
 
