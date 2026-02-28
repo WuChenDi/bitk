@@ -8,3 +8,6 @@ Switched project workflow guidance from `/ptask` to `/pma` in AGENTS/CLAUDE and 
 
 ## 2026-02-28 05:55 [progress]
 Moved legacy archive file from repository root `task.md` to `docs/task.md` and updated active guidance references.
+
+## 2026-02-28 06:03 [progress]
+Added `docs/tmp/` to `.gitignore` to keep temporary documentation artifacts out of version control.

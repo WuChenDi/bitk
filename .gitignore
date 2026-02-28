@@ -42,6 +42,7 @@ data/
 
 # Superpowers plugin docs
 docs/superpowers/
+docs/tmp/
 
 # npm cache (leaked via ~/ symlink)
 ~/
