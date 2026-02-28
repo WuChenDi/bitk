@@ -1,5 +1,5 @@
 import type { NormalizedLogEntry } from '@/engines/types'
-import { and, asc, eq, gt, inArray, max, or } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, lt, max, or } from 'drizzle-orm'
 import { db } from '@/db'
 import { issueLogs as logsTable, issuesLogsToolsCall as toolsTable } from '@/db/schema'
 import { MAX_LOG_ENTRIES } from '@/engines/issue/constants'

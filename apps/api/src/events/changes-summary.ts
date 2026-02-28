@@ -43,7 +43,7 @@ async function runGit(args: string[], cwd: string): Promise<{ code: number; stdo
     stdout: 'pipe',
     stderr: 'ignore',
   })
-  const stdout = await new Response(proc.stdout).text()
+  const stdout = proc.stdout ? await new Response(proc.stdout).text() : ''
   const code = await proc.exited
   return { code, stdout }
 }

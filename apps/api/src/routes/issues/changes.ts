@@ -50,14 +50,11 @@ async function runGit(
   const proc = Bun.spawn(['git', ...args], {
     cwd,
     stdout: 'pipe',
-    stderr: 'pipe',
+    stderr: 'ignore',
   })
-  const [stdout, stderr] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-  ])
+  const stdout = proc.stdout ? await new Response(proc.stdout).text() : ''
   const code = await proc.exited
-  return { code, stdout, stderr }
+  return { code, stdout, stderr: '' }
 }
 
 async function isGitRepo(cwd: string): Promise<boolean> {
@@ -165,22 +162,26 @@ async function summarizeFileLines(
     }
   }
 
-  const { code, stdout } = await runGit(
-    ['diff', '--numstat', '--no-color', '--no-ext-diff', baseRef, '--', file.path],
-    cwd,
-  )
-  if (code !== 0) return { additions: 0, deletions: 0 }
+  try {
+    const { code, stdout } = await runGit(
+      ['diff', '--numstat', '--no-color', '--no-ext-diff', baseRef, '--', file.path],
+      cwd,
+    )
+    if (code !== 0) return { additions: 0, deletions: 0 }
 
-  const firstLine = stdout
-    .split('\n')
-    .map((line) => line.trim())
-    .find(Boolean)
-  if (!firstLine) return { additions: 0, deletions: 0 }
+    const firstLine = stdout
+      .split('\n')
+      .map((line) => line.trim())
+      .find(Boolean)
+    if (!firstLine) return { additions: 0, deletions: 0 }
 
-  const [addRaw, delRaw] = firstLine.split('\t')
-  const additions = Number.isNaN(Number(addRaw)) ? 0 : Number(addRaw)
-  const deletions = Number.isNaN(Number(delRaw)) ? 0 : Number(delRaw)
-  return { additions, deletions }
+    const [addRaw, delRaw] = firstLine.split('\t')
+    const additions = Number.isNaN(Number(addRaw)) ? 0 : Number(addRaw)
+    const deletions = Number.isNaN(Number(delRaw)) ? 0 : Number(delRaw)
+    return { additions, deletions }
+  } catch {
+    return { additions: 0, deletions: 0 }
+  }
 }
 
 // ---------- Routes ----------
