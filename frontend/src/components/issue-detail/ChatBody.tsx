@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import {
@@ -11,6 +11,16 @@ import {
 import { useIssueStream } from '@/hooks/use-issue-stream'
 import { STATUS_MAP } from '@/lib/statuses'
 import type { Issue, NormalizedLogEntry } from '@/types/kanban'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { IssueDetail } from './IssueDetail'
 import { ChatInput } from './ChatInput'
 import { SessionMessages } from './SessionMessages'
@@ -114,17 +124,20 @@ export function ChatBody({
   const updateIssue = useUpdateIssue(projectId)
   const cancelIssue = useCancelIssue(projectId)
   const deleteIssueMutation = useDeleteIssue(projectId)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const handleDelete = useCallback(() => {
-    const message =
-      issue.childCount && issue.childCount > 0
-        ? `${t('issue.deleteConfirm')}\n\n${t('issue.deleteWithChildren')}`
-        : t('issue.deleteConfirm')
-    if (window.confirm(message)) {
-      deleteIssueMutation.mutate(issueId)
-      onAfterDelete?.()
-    }
-  }, [issue, t, deleteIssueMutation, issueId, onAfterDelete])
+    setDeleteDialogOpen(true)
+  }, [])
+
+  const handleConfirmDelete = useCallback(() => {
+    deleteIssueMutation.mutate(issueId, {
+      onSuccess: () => {
+        setDeleteDialogOpen(false)
+        onAfterDelete?.()
+      },
+    })
+  }, [deleteIssueMutation, issueId, onAfterDelete])
 
   const hasSession = !!issue.sessionStatus
   const { data: globalCmds } = useGlobalSlashCommands()
@@ -168,6 +181,7 @@ export function ChatBody({
         status={STATUS_MAP.get(issue.statusId)}
         onUpdate={(fields) => updateIssue.mutate({ id: issueId, ...fields })}
         onDelete={handleDelete}
+        isDeleting={deleteIssueMutation.isPending}
       />
 
       {/* Input */}
@@ -187,6 +201,38 @@ export function ChatBody({
           appendServerMessage(messageId, prompt, metadata)
         }}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('issue.delete')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('issue.deleteConfirm')}
+            </AlertDialogDescription>
+            {issue.childCount && issue.childCount > 0 ? (
+              <AlertDialogDescription className="text-destructive">
+                {t('issue.deleteWithChildren')}
+              </AlertDialogDescription>
+            ) : null}
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteIssueMutation.isPending}>
+              {t('common.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={deleteIssueMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault()
+                handleConfirmDelete()
+              }}
+            >
+              {deleteIssueMutation.isPending
+                ? t('issue.deleting')
+                : t('issue.delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

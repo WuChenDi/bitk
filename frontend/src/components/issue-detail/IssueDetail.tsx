@@ -7,11 +7,15 @@ import { STATUSES } from '@/lib/statuses'
 import { tStatus, tPriority } from '@/lib/i18n-utils'
 import { PriorityIcon } from '@/components/kanban/PriorityIcon'
 import { useClickOutside } from '@/hooks/use-click-outside'
+import { Button } from '@/components/ui/button'
 
 export const PRIORITIES: Priority[] = ['urgent', 'high', 'medium', 'low']
 
 export const badgeBase =
   'inline-flex items-center gap-1 rounded-full border px-2 h-[22px] text-[11px] leading-none font-medium whitespace-nowrap'
+
+const badgeButtonBase =
+  'h-[22px] rounded-full px-2 text-[11px] leading-none font-medium gap-1'
 
 function formatDate(iso: string, lang: string) {
   const d = new Date(iso)
@@ -28,6 +32,7 @@ export function IssueDetail({
   status,
   onUpdate,
   onDelete,
+  isDeleting = false,
 }: {
   issue: Issue
   status?: StatusDefinition
@@ -35,6 +40,7 @@ export function IssueDetail({
     fields: Partial<Pick<Issue, 'statusId' | 'priority' | 'devMode'>>,
   ) => void
   onDelete?: () => void
+  isDeleting?: boolean
 }) {
   const { t, i18n } = useTranslation()
 
@@ -54,23 +60,28 @@ export function IssueDetail({
 
       {/* Delete */}
       {onDelete ? (
-        <button
+        <Button
           type="button"
           onClick={onDelete}
-          className={`${badgeBase} cursor-pointer transition-colors border-border/50 bg-muted/20 text-muted-foreground/60 hover:text-destructive hover:border-destructive/30 hover:bg-destructive/10`}
+          size="sm"
+          variant="outline"
+          disabled={isDeleting}
+          className={`${badgeButtonBase} cursor-pointer border-border/50 bg-muted/20 text-muted-foreground/60 hover:text-destructive hover:border-destructive/30 hover:bg-destructive/10`}
           title={t('issue.delete')}
         >
           <Trash2 className="h-3 w-3" />
-          <span>{t('issue.delete')}</span>
-        </button>
+          <span>{isDeleting ? t('issue.deleting') : t('issue.delete')}</span>
+        </Button>
       ) : null}
 
       {/* Dev mode toggle + Created (right side) */}
       <div className="ml-auto flex items-center gap-1.5">
-        <button
+        <Button
           type="button"
           onClick={() => onUpdate?.({ devMode: !issue.devMode })}
-          className={`${badgeBase} cursor-pointer transition-colors ${
+          size="sm"
+          variant="outline"
+          className={`${badgeButtonBase} cursor-pointer ${
             issue.devMode
               ? 'border-amber-400/40 bg-amber-500/10 text-amber-600 dark:text-amber-400'
               : 'border-border/50 bg-muted/20 text-muted-foreground/60 hover:text-muted-foreground'
@@ -79,7 +90,7 @@ export function IssueDetail({
         >
           <Bug className="h-3 w-3" />
           <span>{t('issue.dev')}</span>
-        </button>
+        </Button>
         <span
           className={`${badgeBase} border-border/50 bg-muted/20 text-muted-foreground/80`}
         >
@@ -107,10 +118,12 @@ export function StatusSelect({
 
   return (
     <div ref={ref} className="relative flex">
-      <button
+      <Button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`${badgeBase} cursor-pointer transition-colors hover:opacity-80`}
+        size="sm"
+        variant="outline"
+        className={`${badgeButtonBase} cursor-pointer transition-colors hover:opacity-80`}
         style={{
           borderColor: `${status.color}30`,
           backgroundColor: `${status.color}08`,
@@ -122,7 +135,7 @@ export function StatusSelect({
         />
         {tStatus(t, status.name)}
         <ChevronDown className="h-3 w-3 opacity-50" />
-      </button>
+      </Button>
       {open ? (
         <div className="absolute left-0 bottom-full mb-1.5 z-50 min-w-[120px] rounded-xl border border-border/60 bg-popover/95 backdrop-blur-sm py-1 shadow-xl text-xs text-popover-foreground">
           {STATUSES.map((s) => {
@@ -167,15 +180,17 @@ export function PrioritySelect({
 
   return (
     <div ref={ref} className="relative flex">
-      <button
+      <Button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`${badgeBase} border-orange-200/50 dark:border-orange-800/30 bg-orange-50/50 dark:bg-orange-950/20 cursor-pointer transition-colors hover:opacity-80`}
+        size="sm"
+        variant="outline"
+        className={`${badgeButtonBase} border-orange-200/50 dark:border-orange-800/30 bg-orange-50/50 dark:bg-orange-950/20 cursor-pointer transition-colors hover:opacity-80`}
       >
         <PriorityIcon priority={value} className="h-3 w-3" />
         {tPriority(t, value)}
         <ChevronDown className="h-3 w-3 opacity-50" />
-      </button>
+      </Button>
       {open ? (
         <div className="absolute left-0 bottom-full mb-1.5 z-50 min-w-[110px] rounded-xl border border-border/60 bg-popover/95 backdrop-blur-sm py-1 shadow-xl text-xs text-popover-foreground">
           {PRIORITIES.map((p) => {
