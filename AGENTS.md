@@ -158,11 +158,19 @@ Components use the shadcn/ui pattern: `cn()` utility (`frontend/src/lib/utils.ts
 - All API routes must have Zod schemas via `@hono/zod-validator` — no `c.req.json<T>()` with compile-time-only types
 - All route handlers must verify project existence and cross-project ownership before operating on scoped entities
 
-## Project Task
+## Project Development
 
-Use the /ptask skill to manage all tasks.
-- Read `task.md` before starting work; create one if it does not exist.
-- Every change, new feature, or bug fix must have a corresponding entry in `task.md`.
+Use the /pma skill to manage project development with a strict three-phase workflow:
+1. Investigation
+2. Proposal
+3. Implement -> Verify -> Record
+
+Rules:
+- Do not implement before explicit confirmation (`proceed` / `开始实现`).
+- Track tasks in `docs/task/index.md` and `docs/task/PREFIX-NNN.md`.
+- Track non-trivial plans in `docs/plan/index.md` and `docs/plan/PLAN-NNN.md`.
 - Task IDs use `PREFIX-NNN` format (e.g. `AUTH-001`); never skip or reuse IDs.
-- **BEFORE starting any task**: immediately mark it `[-]` in `task.md` and set `owner` to your agent name. This is mandatory for multi-agent coordination.
-- Update status markers in place after completing a task.
+- **BEFORE starting any task**: claim it atomically (`[ ] -> [-]` in index, set detail `status: in_progress`, set `owner`).
+- On completion: set task index marker to `[x]` and detail `status: completed`.
+- Keep status updates immediate; do not defer synchronization.
+- `docs/task.md` is retained as legacy history during migration; new workflow uses PMA docs as primary source.

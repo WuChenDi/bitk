@@ -15,6 +15,7 @@ interface UseIssueStreamOptions {
 
 interface UseIssueStreamReturn {
   logs: NormalizedLogEntry[]
+  sessionStatus: SessionStatus | null
   clearLogs: () => void
   appendServerMessage: (
     messageId: string,
@@ -56,6 +57,9 @@ export function useIssueStream({
   devMode = false,
 }: UseIssueStreamOptions): UseIssueStreamReturn {
   const [logs, setLogs] = useState<NormalizedLogEntry[]>([])
+  const [sessionStatus, setSessionStatus] = useState<SessionStatus | null>(
+    externalStatus ?? null,
+  )
   const queryClient = useQueryClient()
 
   const doneReceivedRef = useRef(false)
@@ -96,6 +100,7 @@ export function useIssueStream({
   useEffect(() => {
     if (!issueId || !enabled) {
       streamScopeRef.current = null
+      setSessionStatus(externalStatus ?? null)
       clearLogs()
       return
     }
@@ -103,9 +108,20 @@ export function useIssueStream({
     const scope = `${projectId}:${issueId}`
     if (streamScopeRef.current !== scope) {
       streamScopeRef.current = scope
+      setSessionStatus(externalStatus ?? null)
       clearLogs()
     }
-  }, [projectId, issueId, enabled, clearLogs])
+  }, [projectId, issueId, enabled, clearLogs, externalStatus])
+
+  useEffect(() => {
+    if (!issueId || !enabled) return
+
+    const hasActiveExecution = activeExecutionRef.current !== null
+    const next = externalStatus ?? null
+    if (!hasActiveExecution || next === 'running' || next === 'pending') {
+      setSessionStatus(next)
+    }
+  }, [issueId, enabled, externalStatus])
 
   // Always fetch historical logs from DB (survives server restart)
   useEffect(() => {
@@ -147,6 +163,7 @@ export function useIssueStream({
           // New execution started — track its ID and accept logs
           activeExecutionRef.current = data.executionId
           doneReceivedRef.current = false
+          setSessionStatus(data.state)
         } else if (TERMINAL.has(data.state)) {
           // Only mark done if this terminal event is from the current execution.
           // Stale settled events from a previous turn (arriving after a new
@@ -154,6 +171,8 @@ export function useIssueStream({
           // blocking log events for the active execution.
           if (data.executionId === activeExecutionRef.current) {
             doneReceivedRef.current = true
+            activeExecutionRef.current = null
+            setSessionStatus(data.state)
           }
         }
         // Invalidate React Query so server sessionStatus flows to components
@@ -182,6 +201,7 @@ export function useIssueStream({
 
   return {
     logs,
+    sessionStatus,
     clearLogs,
     appendServerMessage,
   }

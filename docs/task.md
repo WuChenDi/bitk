@@ -1,6 +1,7 @@
 # Kanban App — Task List
 
-> Updated: 2026-02-27
+> Updated: 2026-02-28
+> Legacy notice: Task execution is now managed primarily via PMA files in `docs/task/` and `docs/plan/`.
 > Compressed from 170+ iterative tasks into feature-level tracking.
 
 ## Usage
@@ -19,7 +20,7 @@
 
 - Format: `PREFIX-NNN` — uppercase category prefix + sequential number.
 - IDs are stable once assigned; never reuse or renumber.
-- Next IDs: UI-014, FE-129, BUG-082, SEC-026, ARCH-018, AGENT-012, SSE-004, PERF-005, TEST-009, FEAT-011, OBS-005, AUDIT-006, CLEAN-008, ENG-003, API-006, UX-004, CODEX-007, DB-006
+- Next IDs: UI-014, FE-130, BUG-083, SEC-026, ARCH-018, AGENT-012, SSE-004, PERF-005, TEST-009, FEAT-011, OBS-005, AUDIT-006, CLEAN-008, ENG-004, API-006, UX-004, CODEX-007, DB-006
 
 ### Status Markers
 
@@ -484,6 +485,24 @@
   - activeForm: Fixing duplicate Claude process spawning
   - createdAt: 2026-02-26 21:10
   - owner: claude
+
+- [x] **BUG-082 Fix frontend thinking indicator drifting from server execution status** `P0`
+  - description: Frontend "AI thinking" state can disappear while backend issue status remains `working`, causing visible mismatch and confusion. Align thinking visibility with authoritative server execution state and avoid transient local-state drops during stream reconnection/refetch.
+  - activeForm: Fixing thinking indicator and execution status sync
+  - createdAt: 2026-02-28 05:37
+  - owner: codex
+
+- [x] **FE-129 Replace native issue delete confirm and align destructive UI with shadcn** `P1`
+  - description: Replace the browser native confirm popup used by issue deletion with shadcn AlertDialog, then audit and fix nearby non-standard destructive-action UI patterns for consistency (button style, spacing, interaction feedback) in issue detail/list surfaces.
+  - activeForm: Replacing native delete confirm and polishing destructive UI
+  - createdAt: 2026-02-28 06:00
+  - owner: codex
+
+- [x] **ENG-003 Migrate task workflow from /ptask (`task.md`) to /pma (`docs/task` + `docs/plan`)** `P1`
+  - description: Initialize PMA document system (`docs/task/*`, `docs/plan/*`, `docs/changelog.md`, `docs/architecture.md`), migrate current active tasks into PMA task files, and update AGENTS/CLAUDE instructions from `/ptask` to `/pma`.
+  - activeForm: Migrating project task workflow to PMA
+  - createdAt: 2026-02-28 05:42
+  - owner: codex
 
 ---
 
