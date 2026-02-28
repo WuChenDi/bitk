@@ -16,13 +16,11 @@ export function KanbanColumn({
   issues,
   selectedIssueId,
   onCardClick,
-  onDeleteIssue,
 }: {
   status: StatusDefinition
   issues: Issue[]
   selectedIssueId?: string | null
   onCardClick?: (issue: Issue) => void
-  onDeleteIssue?: (issue: Issue) => void
 }) {
   const { t } = useTranslation()
   const openCreateDialog = usePanelStore((s) => s.openCreateDialog)
@@ -83,7 +81,6 @@ export function KanbanColumn({
             columnStatusId={status.id}
             isSelected={selectedIssueId === issue.id}
             onCardClick={onCardClick}
-            onDelete={onDeleteIssue}
           />
         ))}
         {/* Spacer extends the droppable zone to the bottom of the column */}

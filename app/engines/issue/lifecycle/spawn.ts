@@ -6,6 +6,7 @@ import { logger } from '../../../logger'
 import { getIssueWithSession, updateIssueSession } from '../../engine-store'
 import { engineRegistry } from '../../executors'
 import { WORKTREE_DIR } from '../constants'
+import { emitStateChange } from '../events'
 import { getNextTurnIndex } from '../persistence/queries'
 import { ensureNoActiveProcess, killExistingSubprocessForIssue } from '../process/guards'
 import { register } from '../process/register'
@@ -186,9 +187,20 @@ export async function spawnFollowUpProcess(
     await updateIssueSession(issueId, { model })
   }
 
+  const executionId = crypto.randomUUID()
+  const effectiveModel = model ?? issue.sessionFields.model ?? undefined
+
   await updateIssueSession(issueId, { sessionStatus: 'running' })
 
-  const effectiveModel = model ?? issue.sessionFields.model ?? undefined
+  // Emit SSE 'running' and persist user message BEFORE the potentially slow
+  // process spawn (1-10s for CLI download + startup).  This lets the frontend
+  // show the thinking indicator immediately instead of waiting for spawn.
+  const turnIndex = getNextTurnIndex(issueId)
+  ctx.entryCounters.set(executionId, 0)
+  ctx.turnIndexes.set(executionId, turnIndex)
+  emitStateChange(ctx, issueId, executionId, 'running')
+  const messageId = persistUserMessage(ctx, issueId, executionId, prompt, displayPrompt, metadata)
+
   const baseDir = await resolveWorkingDir(issue.projectId)
 
   // Reuse existing worktree if issue has worktree enabled
@@ -214,7 +226,6 @@ export async function spawnFollowUpProcess(
   }
 
   const permOptions = getPermissionOptions(engineType, permissionMode)
-  const executionId = crypto.randomUUID()
 
   const spawned = await spawnWithSessionFallback(executor, issueId, {
     workingDir,
@@ -227,7 +238,6 @@ export async function spawnFollowUpProcess(
 
   const normalizer = await createLogNormalizer(executor)
 
-  const turnIndex = getNextTurnIndex(issueId)
   register(
     ctx,
     executionId,
@@ -239,7 +249,7 @@ export async function spawnFollowUpProcess(
     metadata?.type === 'system',
     () => handleTurnCompleted(ctx, issueId, executionId),
   )
-  const messageId = persistUserMessage(ctx, issueId, executionId, prompt, displayPrompt, metadata)
+  // User message already persisted above (before spawn)
   monitorCompletion(ctx, executionId, issueId, engineType, false)
   logger.info(
     {

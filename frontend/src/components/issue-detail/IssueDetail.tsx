@@ -52,21 +52,6 @@ export function IssueDetail({
         onChange={(p) => onUpdate?.({ priority: p })}
       />
 
-      {/* Dev mode toggle */}
-      <button
-        type="button"
-        onClick={() => onUpdate?.({ devMode: !issue.devMode })}
-        className={`${badgeBase} cursor-pointer transition-colors ${
-          issue.devMode
-            ? 'border-amber-400/40 bg-amber-500/10 text-amber-600 dark:text-amber-400'
-            : 'border-border/50 bg-muted/20 text-muted-foreground/60 hover:text-muted-foreground'
-        }`}
-        title={t('issue.devMode')}
-      >
-        <Bug className="h-3 w-3" />
-        <span>{t('issue.dev')}</span>
-      </button>
-
       {/* Delete */}
       {onDelete ? (
         <button
@@ -80,13 +65,28 @@ export function IssueDetail({
         </button>
       ) : null}
 
-      {/* Created */}
-      <span
-        className={`${badgeBase} border-border/50 bg-muted/20 text-muted-foreground/80 ml-auto`}
-      >
-        <Calendar className="h-3 w-3" />
-        {formatDate(issue.createdAt, i18n.language)}
-      </span>
+      {/* Dev mode toggle + Created (right side) */}
+      <div className="ml-auto flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onUpdate?.({ devMode: !issue.devMode })}
+          className={`${badgeBase} cursor-pointer transition-colors ${
+            issue.devMode
+              ? 'border-amber-400/40 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+              : 'border-border/50 bg-muted/20 text-muted-foreground/60 hover:text-muted-foreground'
+          }`}
+          title={t('issue.devMode')}
+        >
+          <Bug className="h-3 w-3" />
+          <span>{t('issue.dev')}</span>
+        </button>
+        <span
+          className={`${badgeBase} border-border/50 bg-muted/20 text-muted-foreground/80`}
+        >
+          <Calendar className="h-3 w-3" />
+          {formatDate(issue.createdAt, i18n.language)}
+        </span>
+      </div>
     </div>
   )
 }

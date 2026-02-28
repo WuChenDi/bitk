@@ -46,7 +46,11 @@ export function register(
     group: issueId,
     startAsRunning: true,
   })
-  ctx.entryCounters.set(executionId, 0)
+  // Preserve entryCounters if already initialised (e.g. when the user
+  // message was persisted before the spawn to reduce perceived latency).
+  if (!ctx.entryCounters.has(executionId)) {
+    ctx.entryCounters.set(executionId, 0)
+  }
   ctx.turnIndexes.set(executionId, turnIndex)
   emitStateChange(ctx, issueId, executionId, 'running')
 

@@ -59,11 +59,13 @@ export function useIssueStream({
   const queryClient = useQueryClient()
 
   const doneReceivedRef = useRef(false)
+  const activeExecutionRef = useRef<string | null>(null)
   const streamScopeRef = useRef<string | null>(null)
 
   const clearLogs = useCallback(() => {
     setLogs([])
     doneReceivedRef.current = false
+    activeExecutionRef.current = null
   }, [])
 
   /** Append a user message with a server-assigned messageId */
@@ -142,17 +144,26 @@ export function useIssueStream({
       },
       onState: (data) => {
         if (data.state === 'running' || data.state === 'pending') {
+          // New execution started — track its ID and accept logs
+          activeExecutionRef.current = data.executionId
           doneReceivedRef.current = false
         } else if (TERMINAL.has(data.state)) {
-          doneReceivedRef.current = true
+          // Only mark done if this terminal event is from the current execution.
+          // Stale settled events from a previous turn (arriving after a new
+          // follow-up already emitted 'running') must be ignored to avoid
+          // blocking log events for the active execution.
+          if (data.executionId === activeExecutionRef.current) {
+            doneReceivedRef.current = true
+          }
         }
         // Invalidate React Query so server sessionStatus flows to components
         queryClient.invalidateQueries({
           queryKey: queryKeys.issue(projectId, issueId),
         })
       },
-      onDone: (data) => {
-        doneReceivedRef.current = true
+      onDone: () => {
+        // doneReceivedRef is already managed by onState (which has executionId
+        // to distinguish stale events). onDone only needs to refresh queries.
         queryClient.invalidateQueries({
           queryKey: queryKeys.issue(projectId, issueId),
         })

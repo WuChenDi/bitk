@@ -1,11 +1,7 @@
 import { DragDropProvider } from '@dnd-kit/react'
-import { useCallback, useEffect, useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import {
-  useBulkUpdateIssues,
-  useDeleteIssue,
-  useIssues,
-} from '@/hooks/use-kanban'
+import { useBulkUpdateIssues, useIssues } from '@/hooks/use-kanban'
 import type { Issue } from '@/types/kanban'
 import { useBoardStore } from '@/stores/board-store'
 import { useSelectedIssueId } from '@/stores/panel-store'
@@ -24,7 +20,6 @@ export function KanbanBoard({
   const { t } = useTranslation()
   const { data: issues, isLoading: issuesLoading } = useIssues(projectId)
   const bulkUpdate = useBulkUpdateIssues(projectId)
-  const deleteIssue = useDeleteIssue(projectId)
 
   const { groupedItems, syncFromServer, applyDragOver, applyDragEnd } =
     useBoardStore()
@@ -34,19 +29,6 @@ export function KanbanBoard({
     if (!issues) return
     syncFromServer(issues)
   }, [issues, syncFromServer])
-
-  const handleDelete = useCallback(
-    (issue: Issue) => {
-      const message =
-        issue.childCount && issue.childCount > 0
-          ? `${t('issue.deleteConfirm')}\n\n${t('issue.deleteWithChildren')}`
-          : t('issue.deleteConfirm')
-      if (window.confirm(message)) {
-        deleteIssue.mutate(issue.id)
-      }
-    },
-    [t, deleteIssue],
-  )
 
   const issuesByStatus = useMemo(() => {
     const map = new Map<string, Issue[]>()
@@ -93,7 +75,6 @@ export function KanbanBoard({
             issues={issuesByStatus.get(status.id) ?? []}
             selectedIssueId={selectedIssueId}
             onCardClick={onCardClick}
-            onDeleteIssue={handleDelete}
           />
         ))}
       </div>

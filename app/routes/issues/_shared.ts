@@ -12,6 +12,7 @@ import { issues as issuesTable } from '../../db/schema'
 import { issueEngine } from '../../engines/issue'
 import { emitIssueUpdated } from '../../events/issue-events'
 import { logger } from '../../logger'
+import { toISO } from '../../utils/date'
 
 export const priorityEnum = z.enum(['urgent', 'high', 'medium', 'low'])
 

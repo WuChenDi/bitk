@@ -70,6 +70,24 @@ export function handleTurnCompleted(
         }
       }
 
+      // Guard: if a follow-up reactivated the issue while this async block
+      // was running, the DB sessionStatus will no longer match finalStatus.
+      // Emitting a stale settled event would cause the frontend to block
+      // live log events for the new active execution.
+      const freshIssue = await getIssueWithSession(issueId)
+      if (freshIssue && freshIssue.sessionFields.sessionStatus !== finalStatus) {
+        logger.debug(
+          {
+            issueId,
+            executionId,
+            finalStatus,
+            currentStatus: freshIssue.sessionFields.sessionStatus,
+          },
+          'issue_turn_settle_skipped_reactivated',
+        )
+        return
+      }
+
       await autoMoveToReview(issueId)
       emitIssueSettled(ctx, issueId, executionId, finalStatus)
       logger.info({ issueId, executionId, finalStatus }, 'issue_turn_settled')

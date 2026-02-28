@@ -17,31 +17,6 @@ import { SessionMessages } from './SessionMessages'
 
 // ---------- shared session-state helpers ----------
 
-function hasUnfinishedSegmentIn(logs: NormalizedLogEntry[]): boolean {
-  for (let i = logs.length - 1; i >= 0; i--) {
-    const entry = logs[i]
-    const md = entry.metadata
-    if (
-      md &&
-      (md.turnCompleted === true ||
-        'resultSubtype' in md ||
-        (entry.entryType === 'system-message' && 'duration' in md))
-    ) {
-      return false
-    }
-    if (
-      entry.entryType === 'user-message' ||
-      entry.entryType === 'assistant-message' ||
-      entry.entryType === 'tool-use' ||
-      entry.entryType === 'thinking' ||
-      entry.entryType === 'loading'
-    ) {
-      return true
-    }
-  }
-  return false
-}
-
 function deriveWorkingStep(logs: NormalizedLogEntry[]): string | null {
   for (let i = logs.length - 1; i >= 0; i--) {
     const entry = logs[i]
@@ -91,11 +66,15 @@ export function useSessionState(
   const isSessionActive =
     effectiveStatus === 'running' || effectiveStatus === 'pending'
 
+  // When the session is active (running/pending), always show thinking.
+  // Previously we used hasUnfinishedSegmentIn(logs) to detect mid-turn
+  // completion, but this caused a false negative: when a new follow-up
+  // starts, the old turnCompleted marker is still the last log entry,
+  // making hasUnfinishedSegmentIn() return false for up to several seconds
+  // while the process spawns.  The small trade-off (indicator lingers
+  // ~200ms after a turn actually completes until DB status updates to
+  // 'completed') is far better than the indicator not showing at all.
   const isThinking = isSessionActive
-    ? logs.length === 0
-      ? true
-      : hasUnfinishedSegmentIn(logs)
-    : false
 
   const workingStep = deriveWorkingStep(logs)
 
