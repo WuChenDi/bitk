@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Bug, Calendar, ChevronDown } from 'lucide-react'
+import { Bug, Calendar, ChevronDown, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { Issue, Priority } from '@/types/kanban'
 import type { StatusDefinition, StatusId } from '@/lib/statuses'
@@ -27,12 +27,14 @@ export function IssueDetail({
   issue,
   status,
   onUpdate,
+  onDelete,
 }: {
   issue: Issue
   status?: StatusDefinition
   onUpdate?: (
     fields: Partial<Pick<Issue, 'statusId' | 'priority' | 'devMode'>>,
   ) => void
+  onDelete?: () => void
 }) {
   const { t, i18n } = useTranslation()
 
@@ -64,6 +66,19 @@ export function IssueDetail({
         <Bug className="h-3 w-3" />
         <span>{t('issue.dev')}</span>
       </button>
+
+      {/* Delete */}
+      {onDelete ? (
+        <button
+          type="button"
+          onClick={onDelete}
+          className={`${badgeBase} cursor-pointer transition-colors border-border/50 bg-muted/20 text-muted-foreground/60 hover:text-destructive hover:border-destructive/30 hover:bg-destructive/10`}
+          title={t('issue.delete')}
+        >
+          <Trash2 className="h-3 w-3" />
+          <span>{t('issue.delete')}</span>
+        </button>
+      ) : null}
 
       {/* Created */}
       <span

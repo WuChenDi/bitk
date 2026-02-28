@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Maximize2, Link, Check, Plus, Trash2 } from 'lucide-react'
+import { X, Maximize2, Link, Check, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { ChatBody } from '@/components/issue-detail/ChatBody'
 import { DiffPanel } from '@/components/issue-detail/DiffPanel'
 import { SubIssueDialog } from '@/components/issue-detail/SubIssueDialog'
-import { useDeleteIssue, useIssue, useUpdateIssue } from '@/hooks/use-kanban'
+import { useIssue, useUpdateIssue } from '@/hooks/use-kanban'
 
 const DEFAULT_DIFF_WIDTH = 360
 
@@ -39,7 +39,6 @@ export function IssuePanel({
   const effectiveIssue = issue
 
   const updateIssue = useUpdateIssue(projectId)
-  const deleteIssueMutation = useDeleteIssue(projectId)
 
   const displayId = effectiveIssue ? `#${effectiveIssue.issueNumber}` : ''
 
@@ -79,18 +78,6 @@ export function IssuePanel({
       }
     }
   }
-
-  const handleDelete = useCallback(() => {
-    if (!effectiveIssue || !issueId) return
-    const message =
-      effectiveIssue.childCount && effectiveIssue.childCount > 0
-        ? `${t('issue.deleteConfirm')}\n\n${t('issue.deleteWithChildren')}`
-        : t('issue.deleteConfirm')
-    if (window.confirm(message)) {
-      deleteIssueMutation.mutate(issueId)
-      onClose()
-    }
-  }, [effectiveIssue, issueId, t, deleteIssueMutation, onClose])
 
   const handleCopyLink = () => {
     if (!issueId) return
@@ -189,15 +176,6 @@ export function IssuePanel({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 text-muted-foreground hover:text-destructive transition-colors"
-            title={t('issue.delete')}
-            onClick={handleDelete}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
             className="h-7 w-7 text-muted-foreground hover:text-foreground transition-colors"
             title={t('issue.closePanel')}
             onClick={onClose}
@@ -216,6 +194,7 @@ export function IssuePanel({
           showDiff={showDiff}
           onToggleDiff={() => setShowDiff((v) => !v)}
           scrollRef={scrollRef}
+          onAfterDelete={onClose}
         />
       ) : null}
 

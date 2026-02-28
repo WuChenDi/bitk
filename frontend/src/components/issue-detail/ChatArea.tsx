@@ -55,6 +55,14 @@ export function ChatArea({
     }
   }, [issue])
 
+  const handleAfterDelete = useCallback(() => {
+    navigate(
+      showBackToList
+        ? `/projects/${projectId}/issues`
+        : `/projects/${projectId}`,
+    )
+  }, [navigate, showBackToList, projectId])
+
   if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -194,6 +202,7 @@ export function ChatArea({
           showDiff={showDiff}
           onToggleDiff={onToggleDiff}
           scrollRef={scrollRef}
+          onAfterDelete={handleAfterDelete}
         />
       </div>
 

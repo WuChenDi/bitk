@@ -1,6 +1,9 @@
-import { useRef } from 'react'
+import { useCallback, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   useCancelIssue,
+  useDeleteIssue,
   useGlobalSlashCommands,
   useSlashCommands,
   useUpdateIssue,
@@ -115,6 +118,7 @@ export function ChatBody({
   showDiff,
   onToggleDiff,
   scrollRef: externalScrollRef,
+  onAfterDelete,
 }: {
   projectId: string
   issueId: string
@@ -122,12 +126,26 @@ export function ChatBody({
   showDiff: boolean
   onToggleDiff: () => void
   scrollRef?: React.RefObject<HTMLDivElement | null>
+  onAfterDelete?: () => void
 }) {
+  const { t } = useTranslation()
   const internalScrollRef = useRef<HTMLDivElement>(null)
   const scrollRef = externalScrollRef ?? internalScrollRef
 
   const updateIssue = useUpdateIssue(projectId)
   const cancelIssue = useCancelIssue(projectId)
+  const deleteIssueMutation = useDeleteIssue(projectId)
+
+  const handleDelete = useCallback(() => {
+    const message =
+      issue.childCount && issue.childCount > 0
+        ? `${t('issue.deleteConfirm')}\n\n${t('issue.deleteWithChildren')}`
+        : t('issue.deleteConfirm')
+    if (window.confirm(message)) {
+      deleteIssueMutation.mutate(issueId)
+      onAfterDelete?.()
+    }
+  }, [issue, t, deleteIssueMutation, issueId, onAfterDelete])
 
   const hasSession = !!issue.sessionStatus
   const { data: globalCmds } = useGlobalSlashCommands()
@@ -160,6 +178,7 @@ export function ChatBody({
         issue={issue}
         status={STATUS_MAP.get(issue.statusId)}
         onUpdate={(fields) => updateIssue.mutate({ id: issueId, ...fields })}
+        onDelete={handleDelete}
       />
 
       {/* Input */}
