@@ -5,12 +5,15 @@ import { DirectoryPicker } from '@/components/DirectoryPicker'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
-  DialogCloseButton,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Field, FieldGroup } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { useCreateProject, useWorkspacePath } from '@/hooks/use-kanban'
 import type { Project } from '@/types/kanban'
 
@@ -92,22 +95,21 @@ export function CreateProjectDialog({
         if (!v) reset()
       }}
     >
-      <DialogContent className="max-w-[calc(100%-2rem)] md:max-w-lg">
+      <DialogContent className="md:max-w-lg">
         <DialogHeader>
-          <div>
-            <DialogTitle>{t('project.create')}</DialogTitle>
-            <DialogDescription className="mt-1">
-              {t('project.createDescription')}
-            </DialogDescription>
-          </div>
-          <DialogCloseButton />
+          <DialogTitle>{t('project.create')}</DialogTitle>
+          <DialogDescription>
+            {t('project.createDescription')}
+          </DialogDescription>
         </DialogHeader>
-        <div className="max-h-[85dvh] overflow-y-auto space-y-4 px-5 pb-5 pt-3">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              {t('project.name')} <span className="text-destructive">*</span>
-            </label>
-            <input
+
+        <FieldGroup>
+          <Field>
+            <Label>
+              <span className="text-destructive">*</span>
+              {t('project.name')}
+            </Label>
+            <Input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -115,13 +117,11 @@ export function CreateProjectDialog({
               autoFocus
               className={inputClass}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              {t('project.alias')}
-            </label>
-            <input
+          <Field>
+            <Label>{t('project.alias')}</Label>
+            <Input
               type="text"
               value={alias}
               onChange={(e) =>
@@ -133,41 +133,37 @@ export function CreateProjectDialog({
             <p className="text-[11px] text-muted-foreground">
               {t('project.aliasHint')}
             </p>
-          </div>
+          </Field>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              {t('project.description')}
-            </label>
-            <textarea
+          <Field>
+            <Label>{t('project.description')}</Label>
+            <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t('project.descriptionPlaceholder')}
               rows={3}
               className={`${inputClass} resize-none`}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              {t('project.directory')}
-            </label>
+          <Field>
+            <Label>{t('project.directory')}</Label>
             <div className="flex gap-1.5">
-              <input
+              <Input
                 type="text"
                 value={directory}
                 onChange={(e) => setDirectory(e.target.value)}
                 placeholder={t('project.directoryPlaceholder')}
                 className={inputClass}
               />
-              <button
-                type="button"
+              <Button
                 onClick={() => setDirPickerOpen(true)}
-                className="flex shrink-0 items-center justify-center rounded-md border px-2.5 hover:bg-accent transition-colors"
+                variant="outline"
+                size="icon"
                 title={t('project.browseDirectories')}
               >
-                <FolderOpen className="h-4 w-4 text-muted-foreground" />
-              </button>
+                <FolderOpen className="size-4 text-muted-foreground" />
+              </Button>
             </div>
             <DirectoryPicker
               open={dirPickerOpen}
@@ -175,26 +171,23 @@ export function CreateProjectDialog({
               initialPath={directory || undefined}
               onSelect={setDirectory}
             />
-          </div>
+          </Field>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              {t('project.repositoryUrl')}
-            </label>
-            <input
+          <Field>
+            <Label>{t('project.repositoryUrl')}</Label>
+            <Input
               type="text"
               value={repositoryUrl}
               onChange={(e) => setRepositoryUrl(e.target.value)}
               placeholder={t('project.repositoryUrlPlaceholder')}
               className={inputClass}
             />
-          </div>
+          </Field>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
           <Button
             className="w-full"
-            variant="outline"
             onClick={handleSubmit}
             disabled={createProject.isPending || !name.trim()}
           >
@@ -202,7 +195,7 @@ export function CreateProjectDialog({
               ? t('project.creating')
               : t('project.createButton')}
           </Button>
-        </div>
+        </FieldGroup>
       </DialogContent>
     </Dialog>
   )
