@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, lt, max, or } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, lt, max } from 'drizzle-orm'
 import { db } from '@/db'
 import {
   issueLogs as logsTable,
@@ -9,13 +9,20 @@ import { isVisibleForMode } from '@/engines/issue/utils/visibility'
 import type { NormalizedLogEntry } from '@/engines/types'
 import { rawToToolAction } from './tool-detail'
 
-/** Fetch logs from DB with tool detail join. */
+/**
+ * Fetch logs from DB with tool detail join.
+ *
+ * Ordering uses the ULID primary key (`id`) which is lexicographically
+ * sortable by creation time — simpler and more reliable than the previous
+ * composite `(turnIndex, entryIndex)` ordering which could produce wrong
+ * results when entryIndex resets across executions.
+ */
 export function getLogsFromDb(
   issueId: string,
   devMode = false,
   opts?: {
-    cursor?: { turnIndex: number; entryIndex: number }
-    before?: { turnIndex: number; entryIndex: number }
+    cursor?: string // ULID id — fetch entries strictly after this
+    before?: string // ULID id — fetch entries strictly before this
     limit?: number
   },
 ): NormalizedLogEntry[] {
@@ -33,31 +40,15 @@ export function getLogsFromDb(
   }
 
   // Reverse mode: fetch from end (latest) or before a cursor point.
-  // Forward mode (cursor): fetch after a cursor point (existing behaviour).
+  // Forward mode (cursor): fetch after a cursor point.
   const isReverse = !opts?.cursor
 
   if (opts?.cursor) {
-    // Forward: rows strictly after (turnIndex, entryIndex)
-    conditions.push(
-      or(
-        gt(logsTable.turnIndex, opts.cursor.turnIndex),
-        and(
-          eq(logsTable.turnIndex, opts.cursor.turnIndex),
-          gt(logsTable.entryIndex, opts.cursor.entryIndex),
-        ),
-      )!,
-    )
+    // Forward: rows strictly after the cursor id
+    conditions.push(gt(logsTable.id, opts.cursor))
   } else if (opts?.before) {
-    // Reverse: rows strictly before (turnIndex, entryIndex)
-    conditions.push(
-      or(
-        lt(logsTable.turnIndex, opts.before.turnIndex),
-        and(
-          eq(logsTable.turnIndex, opts.before.turnIndex),
-          lt(logsTable.entryIndex, opts.before.entryIndex),
-        ),
-      )!,
-    )
+    // Reverse: rows strictly before the cursor id
+    conditions.push(lt(logsTable.id, opts.before))
   }
   // else: no cursor → fetch from end (latest)
 
@@ -66,10 +57,7 @@ export function getLogsFromDb(
     .select()
     .from(logsTable)
     .where(and(...conditions))
-    .orderBy(
-      isReverse ? desc(logsTable.turnIndex) : asc(logsTable.turnIndex),
-      isReverse ? desc(logsTable.entryIndex) : asc(logsTable.entryIndex),
-    )
+    .orderBy(isReverse ? desc(logsTable.id) : asc(logsTable.id))
     .limit(effectiveLimit)
     .all()
 
@@ -88,7 +76,6 @@ export function getLogsFromDb(
     for (const r of toolRows) toolByLogId.set(r.logId, r)
   }
 
-  const includeCursorMeta = !!opts
   return rows
     .map((row) => {
       const parsedMeta = row.metadata ? JSON.parse(row.metadata) : undefined
@@ -99,9 +86,7 @@ export function getLogsFromDb(
         content: row.content.trim(),
         turnIndex: row.turnIndex,
         timestamp: row.timestamp ?? undefined,
-        metadata: includeCursorMeta
-          ? { ...parsedMeta, _cursorEntryIndex: row.entryIndex }
-          : parsedMeta,
+        metadata: parsedMeta,
       }
 
       // Attach tool detail and reconstruct toolAction + content/metadata from tools table

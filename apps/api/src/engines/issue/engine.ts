@@ -164,8 +164,8 @@ export class IssueEngine {
     issueId: string,
     devMode = false,
     opts?: {
-      cursor?: { turnIndex: number; entryIndex: number }
-      before?: { turnIndex: number; entryIndex: number }
+      cursor?: string // ULID id — fetch entries after this
+      before?: string // ULID id — fetch entries before this
       limit?: number
     },
   ): NormalizedLogEntry[] {
