@@ -7,7 +7,10 @@ import { engineRegistry } from '@/engines/executors'
 import { WORKTREE_DIR } from '@/engines/issue/constants'
 import { emitStateChange } from '@/engines/issue/events'
 import { getNextTurnIndex } from '@/engines/issue/persistence/queries'
-import { ensureNoActiveProcess, killExistingSubprocessForIssue } from '@/engines/issue/process/guards'
+import {
+  ensureNoActiveProcess,
+  killExistingSubprocessForIssue,
+} from '@/engines/issue/process/guards'
 import { register } from '@/engines/issue/process/register'
 import { persistUserMessage } from '@/engines/issue/user-message'
 import {

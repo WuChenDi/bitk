@@ -62,9 +62,7 @@ export const usePanelStore = create<PanelStore>((set) => ({
 
 // Derived selectors
 export const useSelectedIssueId = () =>
-  usePanelStore((s) =>
-    s.panel.kind === 'view' ? s.panel.issueId : null,
-  )
+  usePanelStore((s) => (s.panel.kind === 'view' ? s.panel.issueId : null))
 export const useIsPanelOpen = () =>
   usePanelStore((s) => s.panel.kind !== 'closed')
 

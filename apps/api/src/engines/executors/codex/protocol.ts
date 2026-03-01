@@ -80,7 +80,11 @@ export class CodexProtocolHandler {
   private _threadId: string | undefined
   private _turnId: string | undefined
 
-  constructor(stdin: FileSink, stdout: ReadableStream<Uint8Array>, requestTimeout = DEFAULT_REQUEST_TIMEOUT) {
+  constructor(
+    stdin: FileSink,
+    stdout: ReadableStream<Uint8Array>,
+    requestTimeout = DEFAULT_REQUEST_TIMEOUT,
+  ) {
     this.stdin = stdin
     this.requestTimeout = requestTimeout
 

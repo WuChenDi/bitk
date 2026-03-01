@@ -1,10 +1,5 @@
 import type { EngineContext } from './context'
-import type {
-  IssueSettledCallback,
-  LogCallback,
-  StateChangeCallback,
-  UnsubscribeFn,
-} from './types'
+import type { IssueSettledCallback, LogCallback, StateChangeCallback, UnsubscribeFn } from './types'
 import type { NormalizedLogEntry, ProcessStatus } from '@/engines/types'
 import { getIssueDevMode, isVisibleForMode } from './utils/visibility'
 

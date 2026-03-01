@@ -109,17 +109,15 @@ describe('kanbanApi.autoTitleIssue', () => {
       json: () => Promise.resolve({ success: false, error: 'fail' }),
     })
 
-    await expect(
-      kanbanApi.autoTitleIssue('proj-1', 'issue-1'),
-    ).rejects.toThrow('Auto-title failed: 500')
+    await expect(kanbanApi.autoTitleIssue('proj-1', 'issue-1')).rejects.toThrow(
+      'Auto-title failed: 500',
+    )
   })
 })
 
 describe('kanbanApi.followUpIssue', () => {
   it('calls POST with JSON body when no files', async () => {
-    mockFetch.mockResolvedValueOnce(
-      mockJsonResponse({ issueId: 'issue-1' }),
-    )
+    mockFetch.mockResolvedValueOnce(mockJsonResponse({ issueId: 'issue-1' }))
 
     await kanbanApi.followUpIssue({
       projectId: 'proj-1',
@@ -137,9 +135,7 @@ describe('kanbanApi.followUpIssue', () => {
 
 describe('kanbanApi error handling', () => {
   it('throws when success is false', async () => {
-    mockFetch.mockResolvedValueOnce(
-      mockErrorResponse('Something went wrong'),
-    )
+    mockFetch.mockResolvedValueOnce(mockErrorResponse('Something went wrong'))
 
     await expect(kanbanApi.getProjects()).rejects.toThrow(
       'Something went wrong',
