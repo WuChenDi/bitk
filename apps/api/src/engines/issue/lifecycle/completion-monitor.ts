@@ -105,37 +105,44 @@ export function monitorCompletion(
         return
       }
 
-      // If user queued follow-ups while process was active, continue them in order
-      // using a fresh follow-up process after this one exits.
+      // If user queued follow-ups while process was active, merge ALL queued
+      // inputs into a single prompt and spawn one fresh follow-up process.
       if (managed.pendingInputs.length > 0) {
         const queued = [...managed.pendingInputs]
         dispatch(managed, { type: 'CLEAR_PENDING_INPUTS' })
         cleanupDomainData(ctx, executionId)
         try {
-          const first = queued.shift()
-          if (!first) return
-          const result = await spawnFollowUpProcess(
+          const mergedPrompt = queued
+            .map((i) => i.prompt)
+            .filter(Boolean)
+            .join('\n\n')
+          // Use the latest model override (last wins)
+          const lastModel = queued.reduce<string | undefined>(
+            (acc, i) => i.model ?? acc,
+            undefined,
+          )
+          const lastPermission = queued.reduce<
+            (typeof queued)[0]['permissionMode'] | undefined
+          >((acc, i) => i.permissionMode ?? acc, undefined)
+
+          logger.debug(
+            {
+              issueId,
+              executionId,
+              mergedCount: queued.length,
+              promptChars: mergedPrompt.length,
+            },
+            'issue_process_merged_queued_for_new_process',
+          )
+          await spawnFollowUpProcess(
             ctx,
             issueId,
-            first.prompt,
-            first.model,
-            first.permissionMode,
+            mergedPrompt,
+            lastModel,
+            lastPermission,
             undefined,
-            first.metadata,
+            queued[queued.length - 1]?.metadata,
           )
-          const nextManaged = ctx.pm.get(result.executionId)?.meta
-          if (nextManaged && queued.length > 0) {
-            nextManaged.pendingInputs.push(...queued)
-            logger.debug(
-              {
-                issueId,
-                fromExecutionId: executionId,
-                toExecutionId: result.executionId,
-                queued: queued.length,
-              },
-              'issue_process_carryover_queue_to_new_process',
-            )
-          }
           return
         } catch (error) {
           logger.error(

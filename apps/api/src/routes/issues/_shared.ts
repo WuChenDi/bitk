@@ -1,24 +1,20 @@
 import { mkdir, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import * as z from 'zod'
 import { cacheDel, cacheGetOrSet } from '@/cache'
 import { STATUS_IDS } from '@/config'
 import { db } from '@/db'
 import { getAppSetting } from '@/db/helpers'
 import {
-  getPendingMessages,
+  collectPendingWithAttachments,
   markPendingMessagesDispatched,
 } from '@/db/pending-messages'
-import {
-  attachments as attachmentsTable,
-  issues as issuesTable,
-} from '@/db/schema'
+import { issues as issuesTable } from '@/db/schema'
 import { issueEngine } from '@/engines/issue'
 import type { EngineType } from '@/engines/types'
 import { emitIssueUpdated } from '@/events/issue-events'
 import { logger } from '@/logger'
-import { UPLOAD_DIR } from '@/uploads'
 import { toISO } from '@/utils/date'
 
 export const priorityEnum = z.enum(['urgent', 'high', 'medium', 'low'])
@@ -148,23 +144,16 @@ export function flushPendingAsFollowUp(
 ): void {
   void (async () => {
     try {
-      const pending = await getPendingMessages(issueId)
-      if (pending.length === 0) return
-      const attachmentCtx = await getAttachmentContextForLogIds(
-        pending.map((m) => m.id),
-      )
-      const parts = pending.map((m) => {
-        const fileCtx = attachmentCtx.get(m.id) ?? ''
-        return (m.content + fileCtx).trim()
-      })
-      const prompt = parts.filter(Boolean).join('\n\n')
+      const { prompt, pendingIds } =
+        await collectPendingWithAttachments(issueId)
+      if (pendingIds.length === 0) return
       // Emit SSE so frontend shows "AI thinking" indicator
       emitIssueUpdated(issueId, { sessionStatus: 'pending' })
       await issueEngine.followUpIssue(issueId, prompt, issue.model ?? undefined)
       // Delete pending rows only AFTER successful follow-up to prevent message loss
-      await markPendingMessagesDispatched(pending.map((m) => m.id))
+      await markPendingMessagesDispatched(pendingIds)
       logger.debug(
-        { issueId, pendingCount: pending.length },
+        { issueId, pendingCount: pendingIds.length },
         'pending_flushed_as_followup',
       )
     } catch (err) {
@@ -185,63 +174,6 @@ export function normalizePrompt(input: string): string {
 }
 
 /**
- * Build a file-context prompt supplement from attachment DB rows.
- * Mirrors the logic in message.ts `buildFileContext()` but works from
- * stored attachment records rather than in-memory SavedFile objects.
- */
-function buildFileContextFromRows(
-  rows: {
-    originalName: string
-    storedName: string
-    mimeType: string
-    size: number
-  }[],
-): string {
-  if (rows.length === 0) return ''
-  const parts = rows.map((f) => {
-    const absolutePath = resolve(UPLOAD_DIR, f.storedName)
-    if (f.mimeType.startsWith('image/')) {
-      return `[Attached image: ${f.originalName} (${f.mimeType}, ${f.size} bytes) at ${absolutePath}]`
-    }
-    if (
-      f.mimeType.startsWith('text/') ||
-      f.mimeType === 'application/json' ||
-      f.mimeType === 'application/xml'
-    ) {
-      return `[Attached file: ${f.originalName}] at ${absolutePath}`
-    }
-    return `[Attached file: ${f.originalName} (${f.mimeType}, ${f.size} bytes) at ${absolutePath}]`
-  })
-  return `\n\n--- Attached files ---\n${parts.join('\n')}`
-}
-
-/**
- * Look up attachment records for the given log IDs and return file context
- * grouped by log ID.
- */
-async function getAttachmentContextForLogIds(
-  logIds: string[],
-): Promise<Map<string, string>> {
-  if (logIds.length === 0) return new Map()
-  const rows = await db
-    .select()
-    .from(attachmentsTable)
-    .where(inArray(attachmentsTable.logId, logIds))
-  const byLogId = new Map<string, typeof rows>()
-  for (const row of rows) {
-    if (!row.logId) continue
-    const existing = byLogId.get(row.logId) ?? []
-    existing.push(row)
-    byLogId.set(row.logId, existing)
-  }
-  const result = new Map<string, string>()
-  for (const [logId, attachmentRows] of byLogId) {
-    result.set(logId, buildFileContextFromRows(attachmentRows))
-  }
-  return result
-}
-
-/**
  * Collect any queued pending messages, merge them into the prompt.
  * Includes attachment file context so the AI engine sees uploaded files.
  * Returns the effective prompt and pending IDs for deferred deletion.
@@ -252,17 +184,11 @@ export async function collectPendingMessages(
   issueId: string,
   basePrompt: string,
 ): Promise<{ prompt: string; pendingIds: string[] }> {
-  const pending = await getPendingMessages(issueId)
-  if (pending.length === 0) return { prompt: basePrompt, pendingIds: [] }
-  const attachmentCtx = await getAttachmentContextForLogIds(
-    pending.map((m) => m.id),
-  )
-  const parts = pending.map((m) => {
-    const fileCtx = attachmentCtx.get(m.id) ?? ''
-    return (m.content + fileCtx).trim()
-  })
-  const prompt = [basePrompt, ...parts].filter(Boolean).join('\n\n')
-  return { prompt, pendingIds: pending.map((m) => m.id) }
+  const { prompt: pendingPrompt, pendingIds } =
+    await collectPendingWithAttachments(issueId)
+  if (pendingIds.length === 0) return { prompt: basePrompt, pendingIds: [] }
+  const prompt = [basePrompt, pendingPrompt].filter(Boolean).join('\n\n')
+  return { prompt, pendingIds }
 }
 
 /**
@@ -348,20 +274,11 @@ export function triggerIssueExecution(
         }
       }
 
-      const pending = await getPendingMessages(issueId)
-      let effectivePrompt = issue.prompt ?? ''
-      if (pending.length > 0) {
-        const attachmentCtx = await getAttachmentContextForLogIds(
-          pending.map((m) => m.id),
-        )
-        const parts = pending.map((m) => {
-          const fileCtx = attachmentCtx.get(m.id) ?? ''
-          return (m.content + fileCtx).trim()
-        })
-        effectivePrompt = [effectivePrompt, ...parts]
-          .filter(Boolean)
-          .join('\n\n')
-      }
+      const { prompt: pendingPrompt, pendingIds } =
+        await collectPendingWithAttachments(issueId)
+      const effectivePrompt = [issue.prompt ?? '', pendingPrompt]
+        .filter(Boolean)
+        .join('\n\n')
 
       await issueEngine.executeIssue(issueId, {
         engineType: (issue.engineType ?? 'echo') as EngineType,
@@ -371,11 +288,11 @@ export function triggerIssueExecution(
         permissionMode: issue.permissionMode as 'plan' | 'auto' | undefined,
       })
       // Delete pending rows only AFTER successful execution to prevent message loss
-      if (pending.length > 0) {
-        await markPendingMessagesDispatched(pending.map((m) => m.id))
+      if (pendingIds.length > 0) {
+        await markPendingMessagesDispatched(pendingIds)
       }
       logger.debug(
-        { issueId, pendingCount: pending.length },
+        { issueId, pendingCount: pendingIds.length },
         'auto_execute_started',
       )
     } catch (err) {

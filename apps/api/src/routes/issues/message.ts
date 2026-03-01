@@ -58,23 +58,12 @@ async function persistPendingMessage(
 
 /**
  * Build a prompt supplement describing uploaded files.
- * Text files: inline content. Images/binary: file path reference.
  */
 function buildFileContext(savedFiles: SavedFile[]): string {
   if (savedFiles.length === 0) return ''
-  const parts = savedFiles.map((f) => {
-    if (f.mimeType.startsWith('image/')) {
-      return `[Attached image: ${f.originalName} (${f.mimeType}, ${f.size} bytes) at ${f.absolutePath}]`
-    }
-    if (
-      f.mimeType.startsWith('text/') ||
-      f.mimeType === 'application/json' ||
-      f.mimeType === 'application/xml'
-    ) {
-      return `[Attached file: ${f.originalName}] at ${f.absolutePath}`
-    }
-    return `[Attached file: ${f.originalName} (${f.mimeType}, ${f.size} bytes) at ${f.absolutePath}]`
-  })
+  const parts = savedFiles.map(
+    (f) => `[Attached file: ${f.originalName} at ${f.absolutePath}]`,
+  )
   return `\n\n--- Attached files ---\n${parts.join('\n')}`
 }
 

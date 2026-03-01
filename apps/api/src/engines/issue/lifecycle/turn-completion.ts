@@ -1,5 +1,5 @@
 import {
-  getPendingMessages,
+  collectPendingWithAttachments,
   markPendingMessagesDispatched,
 } from '@/db/pending-messages'
 import {
@@ -77,22 +77,22 @@ export function handleTurnCompleted(
 
       // Check for pending DB messages before moving to review.
       // If the user sent messages while the engine was busy, they were queued
-      // as pending in the DB. Auto-flush them as a follow-up instead of
-      // moving the issue to review, so the AI processes them in a fresh turn.
-      const pendingRows = await getPendingMessages(issueId)
-      if (pendingRows.length > 0) {
+      // as pending in the DB. Merge ALL pending messages (with attachments)
+      // into a single follow-up prompt so the AI processes them in one turn.
+      const { prompt: pendingPrompt, pendingIds } =
+        await collectPendingWithAttachments(issueId)
+      if (pendingIds.length > 0) {
         logger.info(
-          { issueId, executionId, pendingCount: pendingRows.length },
+          { issueId, executionId, pendingCount: pendingIds.length },
           'auto_flush_pending_after_turn',
         )
-        const prompt = pendingRows
-          .map((r) => r.content)
-          .filter(Boolean)
-          .join('\n\n')
-        const pendingIds = pendingRows.map((r) => r.id)
         try {
           const issue = await getIssueWithSession(issueId)
-          await ctx.followUpIssue?.(issueId, prompt, issue?.model ?? undefined)
+          await ctx.followUpIssue?.(
+            issueId,
+            pendingPrompt,
+            issue?.model ?? undefined,
+          )
           await markPendingMessagesDispatched(pendingIds)
           return
         } catch (flushErr) {
@@ -137,27 +137,46 @@ export async function flushQueuedInputs(
   managed: ManagedProcess,
 ): Promise<void> {
   if (managed.state !== 'running' || managed.turnInFlight) return
-  const next = managed.pendingInputs.shift()
-  if (!next) return
+  if (managed.pendingInputs.length === 0) return
+
+  // Merge ALL queued inputs into a single message so the agent receives
+  // one combined prompt instead of being sent messages one at a time.
+  const all = managed.pendingInputs.splice(0)
+  const mergedPrompt = all
+    .map((i) => i.prompt)
+    .filter(Boolean)
+    .join('\n\n')
+  // Use the latest model override (last wins)
+  const lastModel = all.reduce<string | undefined>(
+    (acc, i) => i.model ?? acc,
+    undefined,
+  )
+  // Merge display prompts for the UI message bubble
+  const mergedDisplay =
+    all
+      .map((i) => i.displayPrompt)
+      .filter(Boolean)
+      .join('\n\n') || undefined
+
   logger.debug(
     {
       issueId,
       executionId: managed.executionId,
-      remainingQueue: managed.pendingInputs.length,
-      promptChars: next.prompt.length,
+      mergedCount: all.length,
+      promptChars: mergedPrompt.length,
     },
-    'issue_queue_flush_next_input',
+    'issue_queue_flush_merged_inputs',
   )
 
-  if (next.model) {
-    await updateIssueSession(issueId, { model: next.model })
+  if (lastModel) {
+    await updateIssueSession(issueId, { model: lastModel })
   }
   sendInputToRunningProcess(
     ctx,
     issueId,
     managed,
-    next.prompt,
-    next.displayPrompt,
-    next.metadata,
+    mergedPrompt,
+    mergedDisplay,
+    all[all.length - 1]?.metadata,
   )
 }
