@@ -50,9 +50,8 @@ export function getLogs(
   //   cursor mode  → entries must be after the cursor (forward pagination)
   //   reverse mode → entries must be after the DB page's newest entry
   //   neither      → no bound (include all ring buffer entries)
-  const newestDbId = persisted.length > 0
-    ? persisted[persisted.length - 1].messageId
-    : undefined
+  const newestDbId =
+    persisted.length > 0 ? persisted[persisted.length - 1].messageId : undefined
   const lowerBound = opts?.cursor ?? newestDbId
 
   const merged = [...persisted]
