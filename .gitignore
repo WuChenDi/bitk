@@ -55,3 +55,6 @@ apps/frontend/stats.html
 # compiled binary & generated assets
 bitk
 apps/api/src/_static-assets.generated.ts
+
+# core dumps
+core
